@@ -1598,6 +1598,134 @@ describe('spaces', () => {
   })
 })
 
+/*
+ * A name is said in all four shapes.
+ *
+ * A row, a column and a desktop each draw a header of their own to say it on;
+ * the fourth shape is a strip, which has none — its tabs already say what is on
+ * it. So a named space shown as tabs keeps the name on the strip, and keeps the
+ * places of the windows it was, or "Tabs" would be the one of the four that
+ * loses what the space was: the name first, and then the space itself, since a
+ * space with nothing said about it is dissolved into the one around it.
+ */
+describe('a named space through all four shapes', () => {
+  /** A desktop called `Right`, beside a pane, in a row called `Top`. */
+  const mixed = () =>
+    row(
+      [
+        panelNode('items'),
+        float(
+          [
+            { node: panelNode('sources'), rect: { x: 20, y: 20, w: 300, h: 200 } },
+            { node: panelNode('activity'), rect: { x: 90, y: 170, w: 300, h: 220 } },
+          ],
+          'Right',
+        ),
+      ],
+      [0.45, 0.55],
+      'Top',
+    )
+
+  const rightOf = (node: WindowNode) => nodeAt(node, [1])
+
+  it('names a strip the layout named, and nothing else', () => {
+    expect(spaceTitle(group(['a', 'b'], undefined, 'Right'))).toBe('Right')
+    // A strip with no name says nothing rather than `Tabs`: its tabs already
+    // say what is on it, and naming it after itself is no name.
+    expect(spaceTitle(group(['a', 'b']))).toBe('')
+    expect(spaceChrome(group(['a', 'b'], undefined, 'Right'))).toEqual({ title: 'Right' })
+  })
+
+  it('keeps the name and the places when a desktop is shown as tabs', () => {
+    const strip = asGroup(collapseSpace(rightOf(mixed())!))
+    expect(strip.title).toBe('Right')
+    expect(strip.panels).toEqual(['sources', 'activity'])
+    expect(strip.places?.map((place) => place.rect)).toEqual([
+      { x: 20, y: 20, w: 300, h: 200 },
+      { x: 90, y: 170, w: 300, h: 220 },
+    ])
+  })
+
+  it('puts the windows back where they were when the strip is a desktop again', () => {
+    const strip = collapseSpace(rightOf(mixed())!)
+    const back = floatTabs(strip, 'sources')
+    expect(shape(back)).toBe('float(sources@20,20 300x200, activity@90,170 300x220)')
+    expect(back).toMatchObject({ title: 'Right' })
+  })
+
+  it('hands the way back on to the row the strip is spread into', () => {
+    // Through the third shape and into the second: the record is the space's
+    // rather than the shape's, so it survives being read from either.
+    const strip = collapseSpace(rightOf(mixed())!)
+    const spread = spreadTabs(strip, 'sources', 'column')
+    expect(spread).toMatchObject({ title: 'Right', direction: 'column' })
+    expect(shape(floatSplit(asSplit(spread)))).toBe(
+      'float(sources@20,20 300x200, activity@90,170 300x220)',
+    )
+  })
+
+  it('is still a space of its own after the round trip, inside the row it sits in', () => {
+    // The shape that dissolved it: a row spread inside a row is that row —
+    // unless it is a space someone named, which this one is at every step.
+    const tiled = normalizeLayout(replaceAt(mixed(), [1], tileFloat(rightOf(mixed()) as never, 'row')))
+    const tabbed = normalizeLayout(replaceAt(tiled, [1], collapseSpace(nodeAt(tiled, [1])!)))
+    const again = normalizeLayout(spreadTabs(tabbed, 'sources', 'row'))
+
+    expect(shape(tabbed)).toBe('row(items, [sources]|activity)')
+    expect(nodeAt(tabbed, [1])).toMatchObject({ title: 'Right' })
+    expect(shape(again)).toBe('row(items, row(sources, activity))')
+    expect(nodeAt(again, [1])).toMatchObject({ title: 'Right' })
+  })
+
+  it('shares a strip as one tab rather than being emptied into it', () => {
+    // Two strips in one place are one strip, unless one of them is a space
+    // someone said something about — the rule a desktop and a tiled row have.
+    const named = row([panelNode('items'), group(['sources', 'activity'], undefined, 'Right')])
+    expect(shape(collapseSpace(named))).toBe('[items]|([sources]|activity)')
+    expect(shape(collapseSpace(row([panelNode('items'), group(['sources', 'activity'])])))).toBe(
+      '[items]|sources|activity',
+    )
+  })
+
+  it('keeps the name when the tabs change under it, and drops only the places', () => {
+    const strip = asGroup(collapseSpace(rightOf(mixed())!))
+    const left = removePanel(strip, 'activity')
+    expect(left).toMatchObject({ title: 'Right' })
+    // The list no longer pairs with the tabs, so it is not a record of
+    // anything — the same tolerance a split's places and sizes have.
+    expect(asGroup(left).places).toBeUndefined()
+  })
+
+  it('keeps the places through a click on a tab, and carries one along the strip', () => {
+    const strip = asGroup(collapseSpace(rightOf(mixed())!))
+    // Looking at another tab is not a rearrangement of anything.
+    expect(asGroup(setActivePanel(strip, 'activity')).places).toEqual(strip.places)
+
+    // Dragging a tab along the strip takes its place with it, since the place
+    // is that window's rather than that position's.
+    const moved = asGroup(moveTab(strip, 'activity', 0))
+    expect(moved.panels).toEqual(['activity', 'sources'])
+    expect(moved.places?.map((place) => place.rect.x)).toEqual([90, 20])
+    expect(shape(floatTabs(moved, 'sources'))).toBe(
+      'float(activity@90,170 300x220, sources@20,20 300x200)',
+    )
+  })
+
+  it('says the name once when the last pane is wrapped in a space of its own', () => {
+    // A single pane is given a row to hold it, so the four choices have a bar
+    // to be offered from — and the name goes up to that bar rather than being
+    // said twice, once by each.
+    const wrapped = asSplit(rootSpace(group(['a'], undefined, 'Right')))
+    expect(wrapped.title).toBe('Right')
+    expect(asGroup(wrapped.children[0] ?? null).title).toBeUndefined()
+
+    // A strip sharing itself with a space needs no such row: the space in it
+    // speaks for itself, from this very strip.
+    const holding = group([desk()], undefined, 'Top')
+    expect(rootSpace(holding)).toBe(holding)
+  })
+})
+
 describe('fixed and headless spaces', () => {
   const desk = () =>
     float(

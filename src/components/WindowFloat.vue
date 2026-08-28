@@ -301,8 +301,8 @@ const HANDLES: FrameHandle[] = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se']
   flex: 1 1 auto;
   min-width: 0;
   color: var(--dc-fg-0);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--dc-text-meta);
+  font-weight: var(--dc-weight-semibold);
 }
 
 .dc-float__controls {
@@ -333,8 +333,8 @@ const HANDLES: FrameHandle[] = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se']
   border-radius: var(--dc-radius-sm);
   background: transparent;
   color: var(--dc-fg-3);
-  font-size: 12px;
-  line-height: 1;
+  font-size: var(--dc-text-meta);
+  line-height: var(--dc-leading-flat);
   cursor: default;
 }
 

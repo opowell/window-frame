@@ -29,6 +29,8 @@ import {
   frameBar,
   frameMenuButton,
   maximizeButton,
+  menuGroup,
+  menuHeadings,
   menuItem,
   minimizeButton,
   menubarItem,
@@ -45,6 +47,7 @@ import {
   spaceMenuButton,
   spaceMode,
   spaceTab,
+  stripName,
   tab,
   tabNames,
   tabOrder,
@@ -612,6 +615,10 @@ test.describe('Window — moving tabs', () => {
 
 const FLOATING = 'window-panel-grid--floating'
 const FLOATING_MIXED = 'window-panel-grid--floating-beside-tiled'
+/** A row called `Top` holding items and a strip called `Right`. */
+const NAMED_STRIP = 'window-panel-grid--named-strip'
+/** The same, with `space-names` off. */
+const NAMED_STRIP_PLAIN = 'window-panel-grid--named-strip-plain'
 const FLOATING_NESTED = 'window-panel-grid--floating-tabs-and-grids'
 const FLOATING_NO_RESIZE = 'window-panel-grid--floating-fixed-size'
 
@@ -1394,6 +1401,93 @@ test.describe('Window — the space menu', () => {
  * same way a desktop's title bar names itself for its menu.
  */
 /*
+ * What a menu item is about.
+ *
+ * A pane's menu answers two questions at once: what the panel on top is
+ * showing, and how the tabs it is one of are arranged. Both answers are a
+ * short list of names with one of them ticked, so nothing in the shape of
+ * either says which is which — and a submenu holding one of them only sets it
+ * beside the other. A heading over each says it, and is left out where there
+ * is only one thing to be about.
+ */
+test.describe('Window — what a menu item is about', () => {
+  test('names the panel and the tabs, and puts each group under its own', async ({ page }) => {
+    await gotoStory(page, TABS_ONLY)
+    await openPaneMenu(page, 'items')
+
+    expect(await menuHeadings(page).allInnerTexts()).toEqual(['Items', 'These tabs'])
+
+    // The view is under the panel's name, since it is that panel's view; the
+    // four shapes and the two steps are under the tabs', since every one of
+    // them is about the strip rather than the tab it was opened from.
+    expect(
+      await menuGroup(page, 'Items').evaluateAll((all) => all.map((item) => item.dataset.dcItem)),
+    ).toEqual(['view'])
+    expect(
+      await menuGroup(page, 'These tabs').evaluateAll((all) =>
+        all.map((item) => item.dataset.dcItem),
+      ),
+    ).toEqual(['show-row', 'show-column', 'show-tabs', 'show-desktop', 'next-tab', 'previous-tab'])
+  })
+
+  test('a heading is a name and not a choice', async ({ page }) => {
+    await gotoStory(page, TABS_ONLY)
+    await paneMenuButton(page, 'items').focus()
+
+    // The first heading is the first thing in the menu, and the keyboard opens
+    // onto the item under it: a name is not somewhere to land.
+    await page.keyboard.press('ArrowDown')
+    await expect(menuItem(page, 'view')).toBeFocused()
+    await expect(menuHeadings(page).first()).not.toHaveClass(/dc-menu__item/)
+
+    // Nor is it read twice: the group it opens says the name, and the heading
+    // itself is drawn for the eye.
+    await expect(menuHeadings(page).first()).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  test('names nothing when the whole menu is about one thing', async ({ page }) => {
+    // A pane of host content offers its views and nothing else.
+    await gotoStory(page, PANE_MENU)
+    await openPaneMenu(page, 'items')
+    await expect(menuHeadings(page)).toHaveCount(0)
+    await page.keyboard.press('Escape')
+
+    // And a space with a bar of its own offers the four shapes and nothing
+    // else, since nothing shares its strip.
+    await spaceMenuButton(page, '1').click()
+    await expect(menuHeadings(page)).toHaveCount(0)
+  })
+
+  test('says the name the layout gave the tabs', async ({ page }) => {
+    await gotoStory(page, FLOATING_MIXED)
+    await chooseSpaceMenu(page, '', 'show-tabs')
+
+    // `Top` is what the strip is called, so it is what its own items are
+    // under — the generic name is for a strip that has none.
+    await openPaneMenu(page, 'items')
+    expect(await menuHeadings(page).allInnerTexts()).toEqual(['Items', 'Top'])
+  })
+
+  test("a space's own menu names the space and the strip it is a tab of", async ({ page }) => {
+    await gotoStory(page, FLOATING_MIXED)
+    await chooseSpaceMenu(page, '', 'show-tabs')
+    await spaceTab(page, 'Right').click()
+
+    // The strip speaks for the desktop while its tab is on top, so this menu
+    // is the desktop's four choices and the strip's two steps: two spaces, one
+    // inside the other, and a name over each.
+    await paneMenuButton(page, 'items').click()
+    expect(await menuHeadings(page).allInnerTexts()).toEqual(['Right', 'Top'])
+    expect(
+      await menuGroup(page, 'Right').evaluateAll((all) => all.map((item) => item.dataset.dcItem)),
+    ).toEqual(['show-row', 'show-column', 'show-tabs', 'show-desktop'])
+    expect(
+      await menuGroup(page, 'Top').evaluateAll((all) => all.map((item) => item.dataset.dcItem)),
+    ).toEqual(['next-tab', 'previous-tab'])
+  })
+})
+
+/*
  * A space the layout named.
  *
  * `FLOATING_MIXED` is a row called `Top` holding items and a desktop called
@@ -1430,6 +1524,84 @@ test.describe('Window — a space the layout named', () => {
     await dragPanel(page, 'notes', 'items', 'center')
 
     expect(await panelOrder(page)).toEqual(['notes', 'activity'])
+    await expect(space(page, '1').locator('> .dc-space__head .dc-space__title')).toHaveText('Right')
+  })
+
+  /*
+   * The fourth shape, which is the one with no header of its own to say a name
+   * on: a strip's tabs say what is in it, so a named one says the name in front
+   * of them. Without that the name would die on the way through — and with it
+   * the space, since the row it would be spread back into is the row around it.
+   */
+  test('says its name on the strip it becomes, and is still named coming back', async ({
+    page,
+  }) => {
+    await gotoStory(page, FLOATING_MIXED)
+    await chooseSpaceMenu(page, '1', 'show-tabs')
+
+    // One strip of the desktop's three windows, called what the desktop was.
+    expect(await tabOrder(page, 'sources')).toEqual(['sources', 'activity', 'notes'])
+    await expect(stripName(page).first()).toHaveText('Right')
+
+    // Back to a row from the strip's own menu: the space is still `Right`,
+    // still a space of its own inside the row `Top` rather than flattened into
+    // it, and its bar carries the four choices again.
+    await choosePaneMenu(page, 'sources', 'show-row')
+    expect(await spaceMode(page, '1')).toBe('row')
+    await expect(space(page, '1').locator('> .dc-space__head .dc-space__title')).toHaveText('Right')
+    await expect(spaceMenuButton(page, '1')).toHaveCount(1)
+  })
+
+  test('brings its windows back to where they were from the strip', async ({ page }) => {
+    await gotoStory(page, FLOATING_MIXED)
+    const before = await frameBox(page, 'notes')
+
+    // Through the third shape and out the other side, which is the round trip
+    // the places on the strip are for.
+    await chooseSpaceMenu(page, '1', 'show-tabs')
+    await choosePaneMenu(page, 'sources', 'show-desktop')
+
+    expect(await spaceMode(page, '1')).toBe('desktop')
+    await expect(space(page, '1').locator('> .dc-space__head .dc-space__title')).toHaveText('Right')
+    const after = await frameBox(page, 'notes')
+    expect(after.x).toBeCloseTo(before.x, 0)
+    expect(after.y).toBeCloseTo(before.y, 0)
+    expect(after.width).toBeCloseTo(before.width, 0)
+    expect(after.height).toBeCloseTo(before.height, 0)
+  })
+
+  test('and the same trip by way of a row, which remembers them too', async ({ page }) => {
+    await gotoStory(page, FLOATING_MIXED)
+    const before = await frameBox(page, 'notes')
+
+    // Desktop, row, tabs, row, desktop: the name and the places are the
+    // space's rather than any one shape's, so neither is spent on the way.
+    await chooseSpaceMenu(page, '1', 'show-row')
+    await chooseSpaceMenu(page, '1', 'show-tabs')
+    await expect(stripName(page).first()).toHaveText('Right')
+    await choosePaneMenu(page, 'sources', 'show-row')
+    await chooseSpaceMenu(page, '1', 'show-desktop')
+
+    expect(await spaceMode(page, '1')).toBe('desktop')
+    const after = await frameBox(page, 'notes')
+    expect(after.x).toBeCloseTo(before.x, 0)
+    expect(after.y).toBeCloseTo(before.y, 0)
+  })
+
+  test('says it in front of the tabs, and not at all when the host says not to', async ({
+    page,
+  }) => {
+    await gotoStory(page, NAMED_STRIP)
+    const name = await stripName(page).first().boundingBox()
+    const first = await tab(page, 'sources').boundingBox()
+    if (!name || !first) throw new Error('The named strip is not on screen')
+    expect(name.x + name.width).toBeLessThanOrEqual(first.x + 1)
+
+    // Off, the strip is tabs and nothing else — and the space is still named
+    // underneath, so it is still a space of its own in the row around it.
+    await gotoStory(page, NAMED_STRIP_PLAIN)
+    await expect(stripName(page)).toHaveCount(0)
+    await choosePaneMenu(page, 'sources', 'show-row')
     await expect(space(page, '1').locator('> .dc-space__head .dc-space__title')).toHaveText('Right')
   })
 })
@@ -1658,10 +1830,12 @@ test.describe('Window — a desktop as a tab', () => {
 
     await expect(floatFrame(page, 'items')).toHaveCount(1)
     expect(await frameOrder(page)).toEqual(['sources', 'activity', 'notes', 'items'])
-    // Nothing is left in the strip but the desktop, so there is no strip: a
-    // set of tabs of one space is that space, and the desktop is the window.
-    expect(await spaceMode(page, '')).toBe('desktop')
-    await expect(spaceTab(page, 'Right')).toHaveCount(0)
+    // Nothing is left in the strip but the desktop — and the strip is `Top`,
+    // which the layout named, so it stays and says so: a set of tabs of one
+    // space is that space only while nothing was said about the strip itself.
+    await expect(stripName(page).first()).toHaveText('Top')
+    expect(await spaceMode(page, '0')).toBe('desktop')
+    await expect(spaceTab(page, 'Right')).toHaveCount(1)
   })
 
   test('steps along the strip, desktop and all', async ({ page }) => {

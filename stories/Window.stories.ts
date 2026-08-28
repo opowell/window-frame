@@ -232,7 +232,16 @@ export const Tabs = story({
   content: CONTENT,
 })
 
-/** Every panel in one pane: a window can be nothing but tabs. */
+/**
+ * Every panel in one pane: a window can be nothing but tabs.
+ *
+ * Items declares views and is one of them, so this menu is about two things at
+ * once — the panel on top, and the tabs it is one of. A heading names each:
+ * *Items* over the view that panel is showing, *These tabs* over the four ways
+ * they can be arranged and the two steps along them. Without them the two are
+ * one list of ticked names, and nothing in it says that four are about the tab
+ * and four are about the strip.
+ */
 export const TabsOnly = story({
   panels: [ITEMS, SOURCES, ACTIVITY],
   layout: group(['items', 'sources', 'activity']),
@@ -467,9 +476,16 @@ export const FloatingTabsAndGrids = story({
  * panes stop dividing the row and share one strip — *Items*, and *Right*.
  * The desktop is one tab rather than three, because its windows are the
  * desktop's rather than the row's, and they are exactly where they were when
- * its tab comes forward. That strip is then the desktop's only bar, so it is
- * the desktop's: the menu on it is the desktop's own four choices, and the way
- * back to a row is on the items tab beside it.
+ * its tab comes forward. That strip is the row it was made from, so it says
+ * *Top* in front of the two tabs, and when the desktop's tab is forward it is
+ * also the desktop's only bar: the menu on it is then the desktop's own four
+ * choices, and the way back to a row is on the items tab beside it.
+ *
+ * **Tabs** on the desktop's own bar is the fourth way from the other end: its
+ * three windows stop being placed and share a strip called *Right*, which
+ * remembers where each of them sat. Choosing **Desktop** on that strip puts
+ * all three back exactly where they were, the same round trip a tiled row
+ * makes — the name and the places are the space's, not the shape's.
  *
  * None of the four panes offers anything but its own views — items declares
  * four, the other three declare none and so open no menu at all. Each holds
@@ -587,6 +603,10 @@ const story2 = (args: WorkbenchStoryArgs) => ({
  * arrange — items' menu is the four views it declares and nothing else, and
  * the two beside it declare none and open no menu at all. A pane of **tabs**
  * does have children, and keeps its own menu: see *Tabs*.
+ *
+ * Nothing here is named, because nothing here is about two things: a menu is
+ * given a heading per group only where it has more than one to tell apart —
+ * see *Tabs Only*, whose pane is a panel with views *and* a strip of tabs.
  */
 export const PaneMenu = story({
   panels: [ITEMS, SOURCES, ACTIVITY],
@@ -633,7 +653,10 @@ export const ContentMenu = story({
  */
 export const Closable = story({
   panels: [ITEMS, SOURCES, ACTIVITY, LOG],
-  layout: row([panelNode('items'), group(['sources', 'activity', 'log'])], [0.6, 0.4]),
+  layout: row([
+    panelNode('items'),
+    group(['sources', 'activity', 'log'])
+  ], [0.6, 0.4]),
   movable: true,
   closable: true,
   content: CONTENT,
@@ -652,6 +675,56 @@ export const NoPaneMenu = story({
 })
 
 /* --------------------------------------------------- fixed, and headless */
+
+/**
+ * **A space with a name.** `title` is the first of the three things a space
+ * says about its own bar, and the plainest: it is called this rather than how
+ * it is shown. The row here is *Top* rather than *Row*, and the three panes
+ * sharing a strip beside items are *Right* rather than nothing at all.
+ *
+ * A strip is the one of the four shapes with no header of its own to say a
+ * name on — its tabs already say what is in it — so a named one says it in
+ * front of them, with a rule between the two: one is what this space is
+ * called, the others are what is in it.
+ *
+ * A name is something said about *that* space, so it survives every shape the
+ * space is left in. Take *Right* through **Row**, **Column** and **Desktop**
+ * from the menu on its bar and back to **Tabs**: it is called *Right* in all
+ * four, and the windows it was shown as come back exactly where they were,
+ * because the strip carries their places the way a tiled row does.
+ */
+export const NamedStrip = story({
+  panels: [ITEMS, SOURCES, ACTIVITY, NOTES],
+  layout: row(
+    [panelNode('items'), group(['sources', 'activity', 'notes'], undefined, 'Right')],
+    [0.6, 0.4],
+    'Top',
+  ),
+  movable: true,
+  content: CONTENT,
+})
+
+/**
+ * **The same strip, saying nothing.** `space-names` is `false`, so a strip
+ * spends itself on tabs alone however the space it is was named — for a window
+ * narrow enough that a name in front of the tabs is a name instead of one.
+ *
+ * The name is not lost, only unsaid: it is still in the layout, the space is
+ * still a space of its own rather than one dissolved into the row around it,
+ * and showing these as a row, a column or a desktop draws a bar that says
+ * *Right* again.
+ */
+export const NamedStripPlain = story({
+  panels: [ITEMS, SOURCES, ACTIVITY, NOTES],
+  layout: row(
+    [panelNode('items'), group(['sources', 'activity', 'notes'], undefined, 'Right')],
+    [0.6, 0.4],
+    'Top',
+  ),
+  spaceNames: false,
+  movable: true,
+  content: CONTENT,
+})
 
 /**
  * **A space whose view is fixed.** The items panel declares all four views and

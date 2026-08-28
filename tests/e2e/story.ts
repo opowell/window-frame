@@ -180,6 +180,12 @@ export const spaceTab = (page: Page, title: string): Locator =>
   page.locator(`.dc-tab[data-dc-space="${title}"]`)
 
 /**
+ * The name a strip says for the space it *is*, in front of its tabs — the
+ * fourth shape's answer to the header a row, a column and a desktop draw.
+ */
+export const stripName = (page: Page): Locator => page.locator('.dc-pane__name')
+
+/**
  * What the tabs of a pane say, in strip order — a panel's title, or the name of
  * a space sharing the strip. `tabOrder` reads ids, which a space tab has none
  * of: it is a space rather than a panel.
@@ -447,6 +453,16 @@ export const menus = (page: Page): Locator => page.locator('.dc-menu')
 /** An item of an open menu, by the id its definition gave it. */
 export const menuItem = (page: Page, item: string): Locator =>
   page.locator(`.dc-menu__item[data-dc-item="${item}"]`)
+
+/** The headings of an open menu, in the order they are read. */
+export const menuHeadings = (page: Page): Locator => menus(page).first().locator('.dc-menu__heading')
+
+/**
+ * The items under one heading, found by the name it says: a heading names the
+ * group it is over, and the group is what holds the items it named.
+ */
+export const menuGroup = (page: Page, name: string): Locator =>
+  menus(page).first().locator(`[role="group"][aria-label="${name}"] > .dc-menu__item`)
 
 /** Opens a pane's menu and waits for it to be up. */
 export async function openPaneMenu(page: Page, id: string): Promise<void> {

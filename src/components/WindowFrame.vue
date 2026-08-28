@@ -100,6 +100,17 @@ const props = withDefaults(
      */
     menu?: boolean
     /**
+     * Whether a strip that *is* a named space says that name beside its tabs.
+     *
+     * A row, a column and a desktop each draw a header of their own to say it
+     * on; a strip has only its tabs, so the name goes in front of them — which
+     * is what keeps a named space named in all four of the shapes it is shown
+     * in. Off, the name is kept in the layout and said again the moment the
+     * space is shown any other way: what a strip spends on chrome is then its
+     * tabs and nothing else.
+     */
+    spaceNames?: boolean
+    /**
      * Extends or replaces the menu a pane offers, given the items it would
      * have had: the content's own, then the window's. Return them with yours
      * appended, or something else entirely.
@@ -110,9 +121,11 @@ const props = withDefaults(
     /** Design tokens set on the window element — `{ '--dc-surface': '#101418' }`. */
     tokens?: Record<string, string>
     /**
-     * `minimal`, the default, is paper, ink and hairlines; `auto` follows the
-     * system setting; `macos` and `windows` wear that system's design language
-     * and follow its scheme; `inherit` brings no palette at all.
+     * `minimal`, the default, is paper, ink and hairlines with nothing else
+     * on; `mono-size` is that theme with every word set at one size and one
+     * weight; `auto` follows the system setting; `macos` and `windows` wear
+     * that system's design language and follow its scheme; `inherit` brings
+     * no palette at all.
      */
     theme?: ShellTheme
   }>(),
@@ -122,6 +135,7 @@ const props = withDefaults(
     minPanelSize: 120,
     closable: false,
     menu: true,
+    spaceNames: true,
     theme: 'minimal',
   },
 )
@@ -1016,9 +1030,44 @@ function contributedFor(id: string): MenuItemDef[] {
   return items
 }
 
+/** A group of menu items, and what to call it when it is not the only one. */
+interface MenuSectionDef {
+  /** Named for what the items are about, since that is what a heading says. */
+  id: string
+  title: string
+  items: MenuItemDef[]
+}
+
 /**
- * The half of a pane's menu the window contributes: which view the panel is
- * showing, how the space around it is shown, and the way along its tabs.
+ * Groups of items with a name over each — or, where only one of them has
+ * anything in it, that one on its own and unnamed.
+ *
+ * A heading answers "which of these is this item about?", so a menu with one
+ * answer has no question to put: a pane of host content offering nothing but
+ * its views is the list of views, the way it always was.
+ */
+function sectioned(groups: MenuSectionDef[]): MenuItemDef[] {
+  const filled = groups.filter((group) => group.items.length > 0)
+  if (filled.length < 2) return filled.flatMap((group) => group.items)
+  return filled.flatMap((group) => [
+    { id: group.id, heading: true, label: group.title },
+    ...group.items,
+  ])
+}
+
+/** What a strip of tabs is called over the items that are about it. */
+const tabsTitle = (home: WindowGroup): string => home.title || 'These tabs'
+
+/**
+ * The half of a pane's menu the window contributes, in the two halves *it* is
+ * really in: what is about the panel on top — which view it is showing — and
+ * what is about the tabs it is one of, how they are shown and the way along
+ * them.
+ *
+ * They come back apart rather than as one list because they are about
+ * different things, and a menu that does not say which is which asks whoever
+ * opened it to know the tree: the view is the panel's, and the four display
+ * modes are its container's. `menuFor` puts a name over each.
  *
  * The four ways a space can be shown are appfr's four display modes, expressed
  * as operations on the tree rather than as a field on a node: a row, a column,
@@ -1028,7 +1077,10 @@ function contributedFor(id: string): MenuItemDef[] {
  * since each returns the tree it was given, identical, when it has nothing to
  * do.
  */
-function windowMenu(current: WindowNode, panel: WindowPanelDef): MenuItemDef[] {
+function windowMenu(
+  current: WindowNode,
+  panel: WindowPanelDef,
+): { panel: MenuItemDef[]; tabs: MenuItemDef[]; tabsTitle: string } {
   const id = panel.id
   const home = groupOf(current, id)
   const tabbed = (home?.panels.length ?? 0) > 1
@@ -1043,7 +1095,9 @@ function windowMenu(current: WindowNode, panel: WindowPanelDef): MenuItemDef[] {
     },
   })
 
-  const items: MenuItemDef[] = []
+  /** About the panel on top, and about the tabs it is one of. */
+  const forPanel: MenuItemDef[] = []
+  const forTabs: MenuItemDef[] = []
 
   /*
    * Which view the panel is showing, from the `views` it declares.
@@ -1057,8 +1111,11 @@ function windowMenu(current: WindowNode, panel: WindowPanelDef): MenuItemDef[] {
    *
    * A submenu rather than four ticked items on the menu itself, which is what
    * the four display modes below are: those name the space, these name what is
-   * in it, and two flat groups of ticked choices in one menu would read as one
-   * list of eight. The label is what tells them apart.
+   * in it, and two flat groups of ticked choices in one menu read as one list
+   * of eight. The label was meant to tell them apart and cannot: a submenu
+   * opens level with the item that opened it, so these four ticked names land
+   * beside the other four with the word that named them behind the pointer.
+   * The heading over each group says it where both can be read at once.
    *
    * A panel offering one view offers no choice, and a space whose display the
    * host fixed offers none either — the same two conditions the switcher was
@@ -1067,7 +1124,7 @@ function windowMenu(current: WindowNode, panel: WindowPanelDef): MenuItemDef[] {
   const offered = panel.views ?? []
   if (offered.length > 1 && !fixedView) {
     const shown = viewFor(id)
-    items.push({
+    forPanel.push({
       id: 'view',
       label: 'View',
       items: offered.map((view) => ({
@@ -1088,7 +1145,8 @@ function windowMenu(current: WindowNode, panel: WindowPanelDef): MenuItemDef[] {
    * They sit on the menu itself rather than behind an item that opens them.
    * Four ticked choices are short enough to read at a glance, and a submenu
    * holding nearly the whole of what the window contributes is a step in front
-   * of every one of them.
+   * of every one of them — the heading over them says what a submenu's label
+   * would have said, and says it without hiding them.
    *
    * A pane holding one panel arranges nothing: what is in it is host content,
    * not panels, so it has nothing to show one way or another. The space it
@@ -1096,8 +1154,7 @@ function windowMenu(current: WindowNode, panel: WindowPanelDef): MenuItemDef[] {
    * their own to say it from — see `spaceMenu`.
    */
   if (tabbed && !fixedView) {
-    if (items.length) items.push({ separator: true })
-    items.push(
+    forTabs.push(
       { id: 'show-row', label: 'Row', checked: false, ...change(spreadTabs(current, id, 'row')) },
       {
         id: 'show-column',
@@ -1129,12 +1186,13 @@ function windowMenu(current: WindowNode, panel: WindowPanelDef): MenuItemDef[] {
    */
 
   if (tabbed && home) {
-    // A rule between the two groups of items, and never one at the top.
-    if (items.length) items.push({ separator: true })
-    items.push(...tabSteps(home, id))
+    // A rule between the four choices and the two, and never one at the top:
+    // both groups are about the same tabs, so one heading is over the pair.
+    if (forTabs.length) forTabs.push({ separator: true })
+    forTabs.push(...tabSteps(home, id))
   }
 
-  return items
+  return { panel: forPanel, tabs: forTabs, tabsTitle: home ? tabsTitle(home) : '' }
 }
 
 /**
@@ -1170,6 +1228,10 @@ function tabSteps(home: WindowGroup, fallback: string): MenuItemDef[] {
  *
  * "Desktop" is what it already is, so it is ticked and cannot be taken; the
  * other three each rewrite the float into the space it would become.
+ *
+ * The two that step along a strip are about the space *around* this one, so
+ * where there is a strip both groups are named — the same two levels a pane's
+ * menu names, a level up.
  */
 function spaceMenu(path: readonly number[]): MenuItemDef[] {
   const current = resolved.value
@@ -1222,20 +1284,32 @@ function spaceMenu(path: readonly number[]): MenuItemDef[] {
    * space has to itself.
    */
   const strip = path.length > 0 ? nodeAt(current, path.slice(0, -1)) : null
-  const steps =
-    strip && isGroup(strip) && strip.panels.length > 1
-      ? [{ separator: true } as MenuItemDef, ...tabSteps(strip, frontPanel(node))]
-      : []
+  const inStrip = strip && isGroup(strip) && strip.panels.length > 1 ? strip : null
 
-  return [
-    mode('row', 'Row', asSplit('row')),
-    mode('column', 'Column', asSplit('column')),
-    // Everything in this space in one strip: the panes as tabs, and a desktop
-    // among them as a tab of its own, keeping the windows on it.
-    mode('tabs', 'Tabs', () => collapseSpace(node, activeIn(node))),
-    mode('desktop', 'Desktop', () => (isFloat(node) ? node : floatSplit(node))),
-    ...steps,
-  ]
+  return sectioned([
+    {
+      id: 'about-space',
+      /*
+       * Its own name, or what it is rather than how it is shown: `spaceTitle`
+       * would answer "Row" for an unnamed row, which is the item directly
+       * under it and the one already ticked.
+       */
+      title: node.title || 'This space',
+      items: [
+        mode('row', 'Row', asSplit('row')),
+        mode('column', 'Column', asSplit('column')),
+        // Everything in this space in one strip: the panes as tabs, and a
+        // desktop among them as a tab of its own, keeping the windows on it.
+        mode('tabs', 'Tabs', () => collapseSpace(node, activeIn(node))),
+        mode('desktop', 'Desktop', () => (isFloat(node) ? node : floatSplit(node))),
+      ],
+    },
+    {
+      id: 'about-tabs',
+      title: inStrip ? tabsTitle(inStrip) : '',
+      items: inStrip ? tabSteps(inStrip, frontPanel(node)) : [],
+    },
+  ])
 }
 
 /**
@@ -1249,23 +1323,35 @@ function activeIn(node: WindowNode): string | undefined {
 }
 
 /**
- * The menu a pane offers.
+ * The menu a pane offers: what is about the panel on top, and what is about
+ * the tabs it is one of, each under a name that says which.
  *
- * The content's own items come first: they are about what is *in* the pane,
- * where everything the window contributes is about the pane itself — and the
- * item someone opened the menu for is far more often the former.
+ * The panel's name is over the first of them because that is the pane's own
+ * answer to *which* panel — a menu opened from a strip of five tabs offers a
+ * view for exactly one of them, and nothing in a list of view names says so.
+ * The tabs are named next, and the four ways they can be shown sit under that
+ * rather than under the tab they were opened from.
+ *
+ * Within the panel's own group the content's items come first: they are about
+ * what is *in* the pane, where the window's *View* is about the pane's own
+ * declared views — and the item someone opened the menu for is far more often
+ * the former.
  */
 function menuFor(id: string): MenuItemDef[] {
   const current = resolved.value
   const panel = byId.value.get(id)
   if (!current || !panel) return []
 
-  const items = contributedFor(id)
-  if (props.menu) {
-    const own = windowMenu(current, panel)
-    if (items.length && own.length) items.push({ separator: true })
-    items.push(...own)
-  }
+  const own = props.menu ? windowMenu(current, panel) : null
+
+  const forPanel = contributedFor(id)
+  if (forPanel.length && own?.panel.length) forPanel.push({ separator: true })
+  if (own) forPanel.push(...own.panel)
+
+  const items = sectioned([
+    { id: 'about-panel', title: panel.title, items: forPanel },
+    { id: 'about-tabs', title: own?.tabsTitle ?? '', items: own?.tabs ?? [] },
+  ])
 
   return props.paneMenu ? props.paneMenu(panel, items) : items
 }
@@ -1292,6 +1378,7 @@ provideWindowContext({
   movable: computed(() => props.movable),
   resizable: computed(() => props.resizable),
   minPanelSize: computed(() => props.minPanelSize),
+  spaceNames: computed(() => props.spaceNames),
   focused,
   dragging,
   dropTarget,
@@ -1467,7 +1554,7 @@ defineExpose({
   margin: auto;
   color: var(--dc-fg-3);
   font-family: var(--dc-mono);
-  font-size: 12px;
+  font-size: var(--dc-text-meta);
 }
 
 .dc-window__ghost {
@@ -1480,8 +1567,8 @@ defineExpose({
   background: var(--dc-raised);
   color: var(--dc-raised-ink);
   box-shadow: var(--dc-shadow);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--dc-text-meta);
+  font-weight: var(--dc-weight-semibold);
   pointer-events: none;
   white-space: nowrap;
 }

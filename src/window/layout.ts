@@ -76,8 +76,13 @@ export function panelNode(id: string): WindowGroup {
 }
 
 /** A group of tabs sharing one space — panels, and whole spaces beside them. */
-export function group(panels: WindowTab[], active?: string): WindowGroup {
-  return active ? { kind: 'group', panels, active } : { kind: 'group', panels }
+export function group(panels: WindowTab[], active?: string, title?: string): WindowGroup {
+  return {
+    kind: 'group',
+    panels,
+    ...(active ? { active } : {}),
+    ...(title ? { title } : {}),
+  }
 }
 
 /*
@@ -195,11 +200,14 @@ export const column = (children: WindowNode[], sizes?: number[], title?: string)
  * becomes.
  *
  * A space shown another way is the same space: a row a host drew without a
- * title bar is still without one once it is a desktop, and one whose display
- * was fixed does not start offering to be changed for having changed.
+ * title bar is still without one once it is a desktop, one whose display was
+ * fixed does not start offering to be changed for having changed, and a space
+ * that was called something is called it in all four shapes — a named desktop
+ * tiled across is a named row, collapsed is a named strip, and back again.
  */
 export function spaceChrome(node: WindowNode): WindowSpace {
   return {
+    ...(node.title ? { title: node.title } : {}),
     ...(node.fixedView ? { fixedView: true } : {}),
     ...(node.headless ? { headless: true } : {}),
   }
@@ -217,7 +225,7 @@ export function spaceChrome(node: WindowNode): WindowSpace {
  * screen to say why.
  */
 const hasChrome = (node: WindowNode): boolean =>
-  node.fixedView === true || node.headless === true || (!isGroup(node) && !!node.title)
+  node.fixedView === true || node.headless === true || !!node.title
 
 /**
  * The same space with no title bar of its own — everything that bar carried
@@ -842,13 +850,17 @@ export const sizesOf = (node: WindowSplit): number[] =>
   normalizeSizes(node.children.length, node.sizes)
 
 /**
- * Where a split's children were as windows, when it still answers for them —
- * one place per child, or nothing at all. A split that was never tiled from a
- * float has none, and one whose children have changed under it has a list that
- * no longer pairs with them, which is the same as having none.
+ * Where a space's children were as windows, when it still answers for them —
+ * one place per child, or nothing at all. A split's children are its panes and
+ * a strip's are its tabs, since both are shapes a desktop is shown in. A space
+ * that was never a desktop has none, and one whose children have changed under
+ * it has a list that no longer pairs with them, which is the same as having
+ * none.
  */
-export const placesOf = (node: WindowSplit): FramePlace[] | undefined =>
-  node.places?.length === node.children.length ? node.places : undefined
+export const placesOf = (node: WindowSplit | WindowGroup): FramePlace[] | undefined => {
+  const held = isGroup(node) ? node.panels.length : node.children.length
+  return node.places?.length === held ? node.places : undefined
+}
 
 /**
  * Collapses the shapes that are indistinguishable on screen: a split with one
@@ -934,7 +946,6 @@ export function normalizeLayout(node: WindowNode): WindowNode {
     direction: node.direction,
     children,
     sizes: normalizeSizes(children.length, shares),
-    ...(node.title ? { title: node.title } : {}),
     ...spaceChrome(node),
     ...(places.length === children.length && places.length > 0 ? { places } : {}),
   }
@@ -946,23 +957,29 @@ function normalizeGroup(node: WindowGroup): WindowNode {
   if (node.panels.every(isPanelTab)) return node
 
   const shown = frontPanel(node)
+  const remembered = placesOf(node)
   const panels: WindowTab[] = []
-  for (const tab of node.panels) {
+  const places: FramePlace[] = []
+  node.panels.forEach((tab, index) => {
+    const place = remembered?.[index]
     if (isPanelTab(tab)) {
       panels.push(tab)
-      continue
+      if (place) places.push(place)
+      return
     }
     const next = normalizeLayout(tab)
-    if (isEmpty(next)) continue
+    if (isEmpty(next)) return
     // Tabs sharing a strip with tabs are that strip's, unless the host shaped
-    // that space — in which case what it said about its own bar is why it
-    // stays a space of its own.
-    if (isGroup(next) && !hasChrome(next)) {
+    // that space, or it remembers a desktop of its own — in which case what it
+    // said about its own bar, or the way back it holds, is why it stays a space
+    // of its own.
+    if (isGroup(next) && !hasChrome(next) && !placesOf(next)) {
       panels.push(...next.panels)
-      continue
+      return
     }
     panels.push(next)
-  }
+    if (place) places.push(place)
+  })
 
   const only = panels[0]
   if (panels.length === 1 && only !== undefined && !isPanelTab(only) && !hasChrome(node)) {
@@ -977,7 +994,13 @@ function normalizeGroup(node: WindowGroup): WindowNode {
 
   // The tab that was on top stays on top, when it is still there to be.
   const active = shown && panels.some((tab) => tabPanels(tab).includes(shown)) ? shown : undefined
-  return { kind: 'group', panels, ...(active ? { active } : {}), ...spaceChrome(node) }
+  return {
+    kind: 'group',
+    panels,
+    ...(active ? { active } : {}),
+    ...spaceChrome(node),
+    ...(places.length === panels.length && places.length > 0 ? { places } : {}),
+  }
 }
 
 /**
@@ -1047,7 +1070,6 @@ export function removePanel(node: WindowNode, id: string): WindowNode | null {
     direction: node.direction,
     children,
     sizes: shares,
-    ...(node.title ? { title: node.title } : {}),
     ...spaceChrome(node),
   })
 }
@@ -1132,7 +1154,6 @@ export function insertPanel(
       direction,
       children,
       sizes: nextSizes,
-      ...(node.title ? { title: node.title } : {}),
       ...spaceChrome(node),
     }
   }
@@ -1147,7 +1168,6 @@ export function insertPanel(
     direction: node.direction,
     children,
     sizes,
-    ...(node.title ? { title: node.title } : {}),
     ...spaceChrome(node),
   }
 }
@@ -1161,7 +1181,9 @@ export function setActivePanel(node: WindowNode, id: string): WindowNode {
   if (isGroup(node)) {
     if (isTabOf(node, id)) {
       if (activePanel(node) === id) return node
-      return { kind: 'group', panels: node.panels, active: id, ...spaceChrome(node) }
+      // Spread rather than rebuilt: the tabs are the same tabs, so what the
+      // strip says about itself and where its windows were are unchanged.
+      return { ...node, active: id }
     }
     // A panel of a space sharing the strip: that space brings its own tab to
     // the top, and this strip names it so the tab it is in is the one showing.
@@ -1172,7 +1194,7 @@ export function setActivePanel(node: WindowNode, id: string): WindowNode {
     if (inner === tab && node.active === id) return node
     const panels = [...node.panels]
     panels[index] = inner
-    return { kind: 'group', panels, active: id, ...spaceChrome(node) }
+    return { ...node, panels, active: id }
   }
   if (!hasPanel(node, id)) return node
   if (isFloat(node)) return mapFrames(node, (child) => setActivePanel(child, id))
@@ -1196,10 +1218,22 @@ export function moveTab(node: WindowNode, id: string, index: number): WindowNode
     const panels = [...node.panels]
     panels.splice(from, 1)
     panels.splice(to, 0, id)
+    // A tab's place on the desktop it was a window of goes where the tab goes:
+    // the two are paired by position, and the place is that window's rather
+    // than that position's.
+    const places = placesOf(node)
+    const moved = places ? [...places] : undefined
+    if (moved) moved.splice(to, 0, ...moved.splice(from, 1))
     // Pinned rather than left to fall back to the first tab: reordering the
     // strip must not change which tab you are looking at.
     const active = frontPanel(node)
-    return { kind: 'group', panels, ...(active ? { active } : {}), ...spaceChrome(node) }
+    return {
+      kind: 'group',
+      panels,
+      ...(active ? { active } : {}),
+      ...spaceChrome(node),
+      ...(moved ? { places: moved } : {}),
+    }
   }
   if (!hasPanel(node, id)) return node
   if (isFloat(node)) return mapFrames(node, (child) => moveTab(child, id, index))
@@ -1354,16 +1388,17 @@ export function setSplitDirection(
  * way of showing it — and it is the loss "Tabs" alone would inflict, since a
  * row, a column and windows all keep every pane the space holds.
  *
- * The same is true of the two splits that are spaces in their own right: one
- * that remembers the desktop it was tiled from carries the way back in its
- * `places`, and one the host shaped — named, fixed, or without a bar at all —
- * has said something about *that* bar. Both become a tab rather than the panes
- * inside them.
+ * The same is true of the spaces that are spaces in their own right: one that
+ * remembers the desktop it was tiled from carries the way back in its `places`,
+ * and one the host shaped — named, fixed, or without a bar at all — has said
+ * something about *that* bar. Both become a tab rather than the panes inside
+ * them, a strip as much as a split: two strips in one place are one strip only
+ * while neither of them is a space anyone said anything about.
  */
 function tabsOf(node: WindowNode): WindowTab[] {
-  if (isGroup(node)) return [...node.panels]
-  if (isFloat(node) || placesOf(node) || hasChrome(node)) return [node]
-  return node.children.flatMap(tabsOf)
+  if (isFloat(node)) return [node]
+  if (placesOf(node) || hasChrome(node)) return [node]
+  return isGroup(node) ? [...node.panels] : node.children.flatMap(tabsOf)
 }
 
 /**
@@ -1376,14 +1411,34 @@ function tabsOf(node: WindowNode): WindowTab[] {
  */
 export function collapseSpace(node: WindowNode, active?: string): WindowNode {
   if (isGroup(node)) return node
-  const panels = childrenOf(node).flatMap(tabsOf)
+  const contributed = childrenOf(node).map(tabsOf)
+  const panels = contributed.flat()
   const shown = active && panels.some((tab) => tabPanels(tab).includes(active)) ? active : undefined
+  const places = collapsedPlaces(node, contributed)
   return normalizeLayout({
     kind: 'group',
     panels,
     ...(shown ? { active: shown } : {}),
     ...spaceChrome(node),
+    ...(places ? { places } : {}),
   })
+}
+
+/**
+ * Where a collapsing space's children were as windows, one per tab — the same
+ * record a tiled split keeps, kept through the strip as well.
+ *
+ * Only when each child is exactly one tab, which is what makes the pairing: a
+ * child that spreads several panes into the strip is no longer one window, and
+ * a list that does not pair is worse than none. A space that was never a
+ * desktop has nothing to remember either way.
+ */
+function collapsedPlaces(node: WindowNode, contributed: WindowTab[][]): FramePlace[] | undefined {
+  const places = isFloat(node)
+    ? node.frames.map(({ node: _node, ...place }) => place)
+    : placesOf(node)
+  if (!places) return undefined
+  return contributed.every((tabs) => tabs.length === 1) ? places : undefined
 }
 
 /**
@@ -1443,11 +1498,18 @@ function withGroup(
  * flattens: the arrangement it describes is the one already on screen.
  */
 export function spreadTabs(layout: WindowNode, id: string, direction: SplitDirection): WindowNode {
-  const next = withGroup(layout, id, (tabs) =>
-    tabs.panels.length > 1
-      ? { ...split(direction, tabs.panels.map(tabNode)), ...spaceChrome(tabs) }
-      : tabs,
-  )
+  const next = withGroup(layout, id, (tabs) => {
+    if (tabs.panels.length < 2) return tabs
+    // A tab per pane, in the same order, so a strip that remembered a desktop
+    // hands that record on rather than spending it: the way back is the same
+    // whichever of the two tiled shapes it is being read from.
+    const places = placesOf(tabs)
+    return {
+      ...split(direction, tabs.panels.map(tabNode)),
+      ...spaceChrome(tabs),
+      ...(places ? { places } : {}),
+    }
+  })
   return next ? normalizeLayout(next) : layout
 }
 
@@ -1508,10 +1570,25 @@ export function floatTabs(layout: WindowNode, id: string, rect?: Partial<FloatRe
   }
 
   const next = withGroup(layout, id, (tabs) => ({
-    ...cascade(tabs.panels.map(tabNode), rect),
+    ...float(placedFrames(tabs.panels.map(tabNode), placesOf(tabs), rect)),
     ...spaceChrome(tabs),
   }))
   return next ? normalizeLayout(next) : layout
+}
+
+/**
+ * Nodes as the windows they were, where a space remembers them — and cascaded
+ * where it does not, because a space that never was a desktop has nowhere to
+ * put them back to.
+ */
+function placedFrames(
+  nodes: WindowNode[],
+  places: FramePlace[] | undefined,
+  rect?: Partial<FloatRect>,
+): FloatFrame[] {
+  return places
+    ? nodes.map((node, index) => ({ ...places[index]!, node }))
+    : cascade(nodes, rect).frames
 }
 
 /**
@@ -1519,11 +1596,7 @@ export function floatTabs(layout: WindowNode, id: string, rect?: Partial<FloatRe
  * this split never was a desktop and so has nowhere to put them back to.
  */
 export function floatSplit(node: WindowSplit, rect?: Partial<FloatRect>): WindowFloat {
-  const places = placesOf(node)
-  const frames = places
-    ? node.children.map((child, index) => ({ ...places[index]!, node: child }))
-    : cascade(node.children, rect).frames
-  return { ...float(frames, node.title), ...spaceChrome(node) }
+  return { ...float(placedFrames(node.children, placesOf(node), rect)), ...spaceChrome(node) }
 }
 
 /**
@@ -1582,7 +1655,6 @@ export function tileFloat(node: WindowFloat, direction: SplitDirection): WindowS
     kind: 'split',
     direction,
     children: order.map((held) => held.node),
-    ...(node.title ? { title: node.title } : {}),
     ...spaceChrome(node),
     places: order.map(({ node: _node, ...place }) => place),
   }
@@ -1606,17 +1678,21 @@ export function toTiled(
  * in front of a float.
  */
 /**
- * What a *space* is called on the title bar it draws for itself.
+ * What a *space* is called on the bar it draws for itself.
  *
  * A container has no tab to take a name from, so it says how it is shown —
  * which is exactly what the menu beside the name switches between, and is
  * true of a space that was never given one rather than merely plausible. A
- * layout that names it wins; a group is not a space of this kind and has no
- * such name.
+ * layout that names it wins.
+ *
+ * A strip is the one shape with nothing to say unnamed: its tabs already say
+ * what is on it, and `Tabs` beside them would name the strip after the thing
+ * the strip is. Named, it says the name — the same name it said as a row, as a
+ * column and as a desktop.
  */
 export function spaceTitle(node: WindowNode): string {
-  if (isGroup(node)) return ''
   if (node.title) return node.title
+  if (isGroup(node)) return ''
   if (isFloat(node)) return 'Desktop'
   return node.direction === 'row' ? 'Row' : 'Column'
 }
@@ -1798,9 +1874,23 @@ export function resizeSplit(
  */
 export function rootSpace(node: WindowNode): WindowNode {
   if (!isGroup(node) || node.panels.length >= 2) return node
-  // What the pane said about its own bar is said by the space around it too:
-  // a host that drew a panel without one did not ask for a row with one.
-  return { ...row([node]), ...spaceChrome(node) }
+  // A strip sharing itself with a space rather than a panel has a space at the
+  // root already — that one, which speaks for itself and offers its own four
+  // choices from this very strip.
+  const only = node.panels[0]
+  if (only !== undefined && !isPanelTab(only)) return node
+  // What the pane said about its own bar is said by the space around it too: a
+  // host that drew a panel without one did not ask for a row with one. Its
+  // name goes up rather than across, since a name is said once and the bar
+  // that says it is now the row's.
+  return { ...row([unnamed(node)]), ...spaceChrome(node) }
+}
+
+/** The same space with no name of its own, the name having gone elsewhere. */
+const unnamed = <T extends WindowNode>(node: T): T => {
+  if (!node.title) return node
+  const { title: _title, ...rest } = node
+  return rest as T
 }
 
 export function defaultLayout(ids: readonly string[]): WindowNode | null {

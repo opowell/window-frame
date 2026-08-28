@@ -74,6 +74,17 @@ const activeId = computed(() => (space.value ? '' : activePanel(props.group)))
 const active = computed(() => (space.value ? null : win.panelFor(activeId.value)))
 /** What the bar says: the panel's title, or the space's own name. */
 const label = computed(() => shown.value?.title ?? '')
+
+/**
+ * The name of the space this strip *is*, when the layout gave it one.
+ *
+ * A row, a column and a desktop each draw a header of their own to say it on;
+ * a strip has only its tabs, so it says it in front of them — which is what
+ * keeps a named space named in the fourth of the four shapes as well as the
+ * other three. The host can turn it off with `space-names`, and the name is
+ * kept in the layout either way.
+ */
+const spaceName = computed(() => (win.spaceNames.value ? (props.group.title ?? '') : ''))
 /** Where the space on top sits in the tree — what its own menu is asked for by. */
 const spacePath = computed(() => [...props.path, shown.value?.index ?? 0])
 
@@ -343,6 +354,21 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
         <span aria-hidden="true">⠿</span>
       </button>
 
+      <!--
+        The name of the space this strip is, in front of the tabs it holds: a
+        name is said about the space rather than about what is on it, so it is
+        not one of the things the tabs switch between.
+      -->
+      <span
+        v-if="spaceName"
+        class="dc-pane__name"
+        :data-dc-space-name="spaceName"
+      >
+        <!-- The name inside the box that draws the rule, so it ellipses on a
+             narrow strip the way a tab's own name does. -->
+        <span class="dc-truncate">{{ spaceName }}</span>
+      </span>
+
       <div
         class="dc-pane__tabs"
         role="tablist"
@@ -565,8 +591,8 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
   border-radius: var(--dc-radius-sm);
   background: transparent;
   color: var(--dc-fg-3);
-  font-size: 13px;
-  line-height: 1;
+  font-size: var(--dc-text-body);
+  line-height: var(--dc-leading-flat);
   cursor: grab;
 }
 
@@ -578,6 +604,25 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
 .dc-pane__grip[aria-pressed='true'] {
   background: var(--dc-accent-bg);
   color: var(--dc-fg-0);
+}
+
+/*
+ * The name of the space the strip is. A rule between it and the tabs, because
+ * the two say different things: one what this space is called, the others what
+ * is in it — and only the second of those is switched between.
+ */
+.dc-pane__name {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  padding-right: 8px;
+  border-right: 1px solid var(--dc-line);
+  color: var(--dc-fg-0);
+  font-size: var(--dc-text-meta);
+  font-weight: var(--dc-weight-semibold);
+  letter-spacing: var(--dc-tracking-wide);
+  white-space: nowrap;
 }
 
 .dc-pane__tabs {
@@ -608,9 +653,9 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--dc-fg-0);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: var(--dc-text-meta);
+  font-weight: var(--dc-weight-semibold);
+  letter-spacing: var(--dc-tracking-wide);
   white-space: nowrap;
   cursor: inherit;
 }
@@ -618,7 +663,7 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
 .dc-pane[data-dc-tabbed='true'] .dc-tab {
   padding: 0 12px;
   color: var(--dc-fg-3);
-  font-weight: 500;
+  font-weight: var(--dc-weight-medium);
 }
 
 .dc-pane[data-dc-tabbed='true'] .dc-tab:hover {
@@ -629,7 +674,7 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
   border-bottom-color: var(--dc-accent);
   background: var(--dc-bg-1);
   color: var(--dc-fg-0);
-  font-weight: 600;
+  font-weight: var(--dc-weight-semibold);
 }
 
 .dc-tab__name {
@@ -643,8 +688,8 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
 }
 
 .dc-pane__sub {
-  font-size: 11px;
-  font-weight: 400;
+  font-size: var(--dc-text-micro);
+  font-weight: var(--dc-weight-regular);
   color: var(--dc-fg-3);
 }
 
@@ -701,8 +746,8 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
   border-radius: var(--dc-radius-sm);
   background: transparent;
   color: var(--dc-fg-3);
-  font-size: 13px;
-  line-height: 1;
+  font-size: var(--dc-text-body);
+  line-height: var(--dc-leading-flat);
   cursor: default;
 }
 

@@ -439,9 +439,9 @@ function onGutterKey(event: KeyboardEvent, index: number) {
   flex: 1 1 auto;
   min-width: 0;
   color: var(--dc-fg-0);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: var(--dc-text-meta);
+  font-weight: var(--dc-weight-semibold);
+  letter-spacing: var(--dc-tracking-wide);
 }
 
 /*

@@ -309,6 +309,8 @@ export interface WindowStoryArgs {
   closable?: boolean
   /** Whether a pane offers the menu that switches how its space is shown. */
   menu?: boolean
+  /** Whether a strip that is a named space says that name beside its tabs. */
+  spaceNames?: boolean
 }
 
 /**
@@ -352,6 +354,7 @@ export function renderWindow(args: WindowStoryArgs) {
             closable: args.closable ?? false,
             onPanelClose: closePanel,
             menu: args.menu ?? true,
+            spaceNames: args.spaceNames ?? true,
             theme: args.theme ?? 'minimal',
             ...(args.accent ? { accent: args.accent } : {}),
           },

@@ -48,10 +48,24 @@ export type SplitDirection = 'row' | 'column'
  * All three kinds of node are spaces, and each draws one bar: a pane's tab
  * strip, a row's or a column's own header, a desktop's title bar — and, when
  * a floating window holds a space rather than a pane, the bar that window
- * draws on its behalf. These two fields are how a host takes part of that bar
- * away, or all of it, and keeps what it carried for itself.
+ * draws on its behalf. These three fields are what a host says about that bar:
+ * what it is called, how much of it is offered, and whether it is drawn at all.
  */
 export interface WindowSpace {
+  /**
+   * What this space is called on its own bar.
+   *
+   * Left out, a space says how it is shown — `Row`, `Column`, `Desktop` — which
+   * is exactly what the menu beside the name switches between; a strip says
+   * nothing, since its tabs already say what is on it.
+   *
+   * A name is something said about *that* space, so it survives every shape the
+   * space is left in: a named desktop tiled across is a named row, collapsed is
+   * a named strip, and back again. It is also why the space is neither
+   * dissolved into the space around it nor collapsed into the pane inside it —
+   * see `hasChrome` in `./layout`.
+   */
+  title?: string
   /**
    * Fixes how this space shows what it holds: a pane offers no choice of view
    * in its menu, and a container is offered no way to be shown as anything
@@ -118,6 +132,19 @@ export interface WindowGroup extends WindowSpace {
    * the group — means the first tab, so a hand-written layout need not say.
    */
   active?: string
+  /**
+   * Where these tabs sat as windows, one per tab in the same order, when this
+   * strip was made by collapsing a desktop — or a split that remembered one.
+   *
+   * The same record {@link WindowSplit.places} keeps, kept through the third
+   * of the four shapes so that the round trip loses nothing whichever way it
+   * goes: a desktop shown as tabs and then as a desktop again puts every window
+   * back exactly where it was.
+   *
+   * The wrong length means the tabs are no longer the windows it remembered, so
+   * it is ignored — the same tolerance the other two lists have.
+   */
+  places?: FramePlace[]
 }
 
 /** A row or column of further nodes. */
@@ -125,12 +152,6 @@ export interface WindowSplit extends WindowSpace {
   kind: 'split'
   direction: SplitDirection
   children: WindowNode[]
-  /**
-   * What this space is called on its own title bar. Left out, it says how it
-   * is shown — `Row` or `Column` — which is what the menu on that bar
-   * switches between.
-   */
-  title?: string
   /**
    * Relative share of the split per child, in the same order. Omitted — or the
    * wrong length — means equal shares, so a hand-written layout can leave it
@@ -197,20 +218,16 @@ export type FramePlace = Omit<FloatFrame, 'node'>
  * A space its children float over rather than divide, each frame at a position
  * and size of its own. Frames overlap, so unlike a split their order is a
  * stacking order: the last one is on top, and clicking a frame puts it there.
+ *
+ * Unnamed it is called `Desktop`, which is how it is shown: it has no tab to
+ * take a name from and no first pane to borrow one from, since the window in
+ * front of it changes every time one is touched — and a space that renames
+ * itself for being clicked on is no name at all.
  */
 export interface WindowFloat extends WindowSpace {
   kind: 'float'
   /** Frames back to front — the last is the one on top. */
   frames: FloatFrame[]
-  /**
-   * What this space is called on its own title bar.
-   *
-   * A float has no tab to take a name from and no first pane to borrow one
-   * from: the window in front of it changes every time one is touched, so
-   * naming it after that would rename the space for clicking on it. Left out,
-   * it is called `Desktop` — which is how it is shown.
-   */
-  title?: string
 }
 
 export type WindowNode = WindowGroup | WindowSplit | WindowFloat
