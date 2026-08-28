@@ -73,6 +73,8 @@ export interface ShellStoryArgs {
    * what the `inherit` theme has to blend into.
    */
   host?: 'paper' | 'slate'
+  /** Slot content, for the stories about what a host puts into the shell. */
+  slots?: Record<string, () => unknown>
 }
 
 /**
@@ -100,7 +102,7 @@ export function renderShell(args: ShellStoryArgs) {
           ...(args.accent ? { accent: args.accent } : {}),
           ...(args.tokens ? { tokens: args.tokens } : {}),
           ...(args.open ? { open: true } : {}),
-        })
+        }, args.slots)
 
       const hosted = () =>
         args.host ? h('div', { class: `sb-host sb-host--${args.host}` }, [shell()]) : shell()
