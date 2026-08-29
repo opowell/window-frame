@@ -259,8 +259,27 @@ export function hasPanel(node: WindowNode, id: string): boolean {
   return node.children.some((child) => hasPanel(child, id))
 }
 
-/** Nothing left to render — every operation drops these rather than keep them. */
+/** Nothing left in it to render. */
 const isEmpty = (node: WindowNode): boolean => panelIds(node).length === 0
+
+/**
+ * A space that holds nothing and is kept anyway: one the host said something
+ * about, and that draws a bar of its own to say it on.
+ *
+ * A row, a column and a desktop each stand above what they hold, so an empty
+ * one is still a place — a name with room under it, and somewhere the pane
+ * that just left can be dropped back. Dropping the space instead would take
+ * the name the moment the last pane was dragged out, with nothing on screen to
+ * say why, which is the very thing `hasChrome` is for.
+ *
+ * A *strip* is not one of them. What says a strip's name is its tabs, so a
+ * strip with none has no bar left to be named on and nothing to drop into: an
+ * empty group goes the way it always did.
+ */
+const staysEmpty = (node: WindowNode): boolean => !isGroup(node) && hasChrome(node)
+
+/** Nothing left to render, and nothing about it worth keeping: it is dropped. */
+const isGone = (node: WindowNode): boolean => isEmpty(node) && !staysEmpty(node)
 
 /**
  * Every space a node holds, each with the index it is addressed by: a split's
@@ -796,6 +815,117 @@ export function floatPanel(
 }
 
 /**
+ * The space with the panel in it: a desktop takes it as a window at the rect
+ * the drop worked out, a row or a column as a pane, and a strip as a tab.
+ *
+ * Added to whatever is there rather than put in its place, though a space this
+ * is asked of holds no panel. It can still hold a space that holds none —
+ * an empty named desktop inside an empty named row — and that is a space with
+ * a name of its own, which nothing here is entitled to write over.
+ */
+function fillSpace(node: WindowNode, panel: string, rect?: FloatRect): WindowNode {
+  if (isFloat(node)) return { ...node, frames: [...node.frames, frame(panelNode(panel), rect)] }
+  if (isGroup(node)) return addTab(node, panel)
+  return {
+    kind: 'split',
+    direction: node.direction,
+    children: [...node.children, panelNode(panel)],
+    sizes: [...sizesOf(node), 1],
+    ...spaceChrome(node),
+  }
+}
+
+/**
+ * One level of that walk: the child on the path takes the panel, and every
+ * other child gives it up. Nothing here has to answer for a space emptying,
+ * since the one the path leads to is gaining the panel rather than losing it.
+ */
+function intoSpace(
+  node: WindowNode,
+  panel: string,
+  path: readonly number[],
+  rect?: FloatRect,
+): WindowNode {
+  const index = path[0]
+  if (index === undefined) return fillSpace(node, panel, rect)
+  const rest = path.slice(1)
+  const step = (child: WindowNode, at: number): WindowNode | null =>
+    at === index ? intoSpace(child, panel, rest, rect) : removePanel(child, panel)
+
+  if (isFloat(node)) {
+    const frames = node.frames.flatMap((held, at) => {
+      const next = step(held.node, at)
+      if (!next) return []
+      return [next === held.node ? held : { ...held, node: next }]
+    })
+    return { ...node, frames }
+  }
+
+  if (isGroup(node)) {
+    const from = activeTab(node)
+    const panels: WindowTab[] = []
+    node.panels.forEach((tab, at) => {
+      if (isPanelTab(tab)) {
+        if (tab !== panel) panels.push(tab)
+        return
+      }
+      const next = step(tab, at)
+      if (next) panels.push(next)
+    })
+    const kept = node.active && panels.some((tab) => tabPanels(tab).includes(node.active as string))
+    const active = kept
+      ? node.active
+      : frontPanel(panels[from] ?? (panels[panels.length - 1] as WindowTab))
+    return {
+      kind: 'group',
+      panels,
+      ...(active ? { active } : {}),
+      ...spaceChrome(node),
+    }
+  }
+
+  const sizes = sizesOf(node)
+  const children: WindowNode[] = []
+  const shares: number[] = []
+  node.children.forEach((child, at) => {
+    const next = step(child, at)
+    if (!next) return
+    children.push(next)
+    shares.push(sizes[at] ?? 0)
+  })
+  return { kind: 'split', direction: node.direction, children, sizes: shares, ...spaceChrome(node) }
+}
+
+/**
+ * Lifts a panel out of wherever it is and puts it into a space that holds
+ * nothing — the one drop no panel can name, there being none in that space to
+ * name it by, so the path it is rendered at names it instead.
+ *
+ * An empty space is one `staysEmpty` kept, and this is the way back into it:
+ * the pane that emptied a named row can be dropped into that row again, and a
+ * window onto the desktop it was dragged off. Without it the name would still
+ * be there and be all that was left, which is half an answer.
+ *
+ * Taking the panel out and putting it down happen in one walk, because a path
+ * is only true of the tree it was read from: lifting the panel out first can
+ * collapse a space beside the one being dropped into, and every path past it
+ * would then name something else.
+ *
+ * Anything that would be a no-op — a path naming no space, or one with a panel
+ * in it already — hands back the layout it was given, identical.
+ */
+export function dropIntoSpace(
+  layout: WindowNode,
+  panel: string,
+  path: readonly number[],
+  rect?: FloatRect,
+): WindowNode {
+  const home = nodeAt(layout, path)
+  if (!home || !isEmpty(home) || !hasPanel(layout, panel)) return layout
+  return normalizeLayout(intoSpace(layout, panel, path, rect))
+}
+
+/**
  * Brings a panel's frame to the front of the float it is on. Returns the tree
  * it was given, identical, when it is already there — so a click on the frame
  * on top does not count as a change to the layout.
@@ -867,7 +997,8 @@ export const placesOf = (node: WindowSplit | WindowGroup): FramePlace[] | undefi
  * child *is* that child, and a split nested inside a split of the same
  * direction is the same row — so it is flattened into its parent, its
  * children keeping their proportion of the share it held. A group that has
- * lost every tab is dropped, since there is nothing left to render.
+ * lost every tab is dropped, since there is nothing left to render — as is a
+ * space of any kind that holds nothing, unless it is one `staysEmpty` keeps.
  *
  * A float is flattened into nothing, because its frames do not divide a space
  * and so cannot be indistinguishable from one another: only what each frame
@@ -897,7 +1028,7 @@ export function normalizeLayout(node: WindowNode): WindowNode {
   if (isFloat(node)) {
     const frames = node.frames.flatMap((held) => {
       const next = normalizeLayout(held.node)
-      if (isEmpty(next)) return []
+      if (isGone(next)) return []
       return [next === held.node ? held : { ...held, node: next }]
     })
     return frames.length === node.frames.length && frames.every((held, i) => held === node.frames[i])
@@ -915,7 +1046,7 @@ export function normalizeLayout(node: WindowNode): WindowNode {
   node.children.forEach((child, index) => {
     const next = normalizeLayout(child)
     const share = sizes[index] ?? 0
-    if (isEmpty(next)) return
+    if (isGone(next)) return
     // A child that is a space of its own — one this split remembers as a
     // window, or one that remembers a desktop of its own — keeps its children
     // rather than handing them over.
@@ -968,7 +1099,7 @@ function normalizeGroup(node: WindowGroup): WindowNode {
       return
     }
     const next = normalizeLayout(tab)
-    if (isEmpty(next)) return
+    if (isGone(next)) return
     // Tabs sharing a strip with tabs are that strip's, unless the host shaped
     // that space, or it remembers a desktop of its own — in which case what it
     // said about its own bar, or the way back it holds, is why it stays a space
@@ -1009,6 +1140,10 @@ function normalizeGroup(node: WindowGroup): WindowNode {
  * else goes with it. Returns `null` when the last panel in the window goes —
  * an empty window is the caller's problem to render, not something to fake a
  * node for.
+ *
+ * A row, a column or a desktop the host said something about stays where it
+ * is, empty: `staysEmpty` says why, and it is the same answer `normalizeLayout`
+ * gives — the space a name is on outlives the panes that were in it.
  */
 export function removePanel(node: WindowNode, id: string): WindowNode | null {
   if (isFloat(node)) {
@@ -1019,7 +1154,7 @@ export function removePanel(node: WindowNode, id: string): WindowNode | null {
       if (!next) return []
       return [next === held.node ? held : { ...held, node: next }]
     })
-    if (frames.length === 0) return null
+    if (frames.length === 0 && !staysEmpty(node)) return null
     return { ...node, frames }
   }
 
@@ -1060,7 +1195,11 @@ export function removePanel(node: WindowNode, id: string): WindowNode | null {
     shares.push(sizes[index] ?? 0)
   })
 
-  if (children.length === 0) return null
+  if (children.length === 0) {
+    return staysEmpty(node)
+      ? { kind: 'split', direction: node.direction, children, sizes: [], ...spaceChrome(node) }
+      : null
+  }
   const only = children[0]
   // The space the removed panel held is shared out among what is left, in
   // proportion to what each already had.
@@ -1669,6 +1808,82 @@ export function toTiled(
     isFloat(container) ? tileFloat(container, direction) : container,
   )
   return next ? normalizeLayout(next) : layout
+}
+
+/* ----------------------------------------------------------------- nesting */
+
+/**
+ * The one space a space holds, when what it holds is one space and nothing
+ * else — or `null` when it holds panes, windows, or nothing of the kind.
+ *
+ * Two spaces arranged that way draw two bars over one content: the outer says
+ * what it is called and offers its four choices, and the inner says what *it*
+ * is called and offers the same four about the very same panes. Nothing else
+ * in the model stays nested that way — `normalizeLayout` collapses a split of
+ * one child into that child, and a strip whose only tab is a space into that
+ * space — so a pair that survives is one the host meant: a space with a name,
+ * a bar of its own to draw or not to, or the desktop it remembers being.
+ *
+ * A float is never either half of one. Its frames are windows placed over the
+ * space rather than dividing it, so a desktop holding one window is a desktop
+ * with a window on it, not a bar drawn twice.
+ *
+ * Nor is a lone *pane*, which is the same distinction `rootSpace` draws: what
+ * is under a pane's header is content rather than panels, so a space holding
+ * one is a space around a pane and not one wrapped around another. A group of
+ * two or more tabs is a space in its own right and counts.
+ */
+export function onlySpace(node: WindowNode): WindowNode | null {
+  if (isFloat(node)) return null
+  const only = isGroup(node)
+    ? node.panels.length === 1
+      ? node.panels[0]
+      : undefined
+    : node.children.length === 1
+      ? node.children[0]
+      : undefined
+  if (only === undefined || isPanelTab(only)) return null
+  return isGroup(only) && only.panels.length === 1 && isPanelTab(only.panels[0]!) ? null : only
+}
+
+/** The same space with nothing said about the bar it draws for itself. */
+const bare = <T extends WindowNode>(node: T): T => {
+  const { title: _title, fixedView: _fixed, headless: _headless, ...rest } = node
+  return rest as T
+}
+
+/**
+ * Two nested spaces made one — `keep` saying which of the two bars is the one
+ * that stays: `outer` for the space this is called on, `inner` for the space
+ * it holds.
+ *
+ * What is *in* them is the same either way, because the inner space's children
+ * were the only content the pair ever had between them. Only the chrome
+ * differs, since chrome is the only thing the two of them said separately:
+ * keep the outer and that content arrives under the outer's name, in the shape
+ * the inner was holding it; keep the inner and the outer's bar goes, taking
+ * what it said with it.
+ *
+ * ```
+ * ┌─ Workspace ──────────────┐            ┌─ Workspace ──────────┐
+ * │ ┌─ Column ─────────────┐ │  'outer'   │ ┌─ Sources ────────┐ │
+ * │ │ ┌─ Sources ────────┐ │ │  ────────▶ │ ├─ Activity ───────┤ │
+ * │ │ ├─ Activity ───────┤ │ │            │ └──────────────────┘ │
+ * │ │ └──────────────────┘ │ │            └──────────────────────┘
+ * │ └──────────────────────┘ │            ┌─ Column ─────────────┐
+ * └──────────────────────────┘  'inner'   │ ┌─ Sources ────────┐ │
+ *                               ────────▶ │ ├─ Activity ───────┤ │
+ *                                         │ └──────────────────┘ │
+ *                                         └──────────────────────┘
+ * ```
+ *
+ * A space holding anything but one space comes back exactly as it was, the way
+ * every operation here does when it has nothing to do.
+ */
+export function mergeSpace(node: WindowNode, keep: 'outer' | 'inner'): WindowNode {
+  const inner = onlySpace(node)
+  if (!inner) return node
+  return keep === 'inner' ? inner : { ...bare(inner), ...spaceChrome(node) }
 }
 
 /**

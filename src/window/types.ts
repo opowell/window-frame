@@ -288,8 +288,13 @@ export interface WindowPanelDef {
 export interface PanelMove {
   /** The panel that moved. */
   panel: string
-  /** A panel of the group it was dropped on. */
+  /** A panel of the group it was dropped on — `''` when `space` says where. */
   target: string
+  /**
+   * The space it was dropped into, by the path it is rendered at: set only for
+   * a drop into a space that held nothing, which has no panel to name it by.
+   */
+  space?: readonly number[]
   edge: DropEdge
   /** Position in the target group's tabs, when it was dropped on the strip. */
   index?: number

@@ -14,6 +14,7 @@ import {
   dragFrameGrip,
   dragFrameGripAt,
   dragOntoDesktop,
+  dragOntoSpace,
   dragPanel,
   dragToTab,
   dropPanel,
@@ -42,8 +43,10 @@ import {
   panelOrder,
   pickUpFrame,
   pickUpOntoDesktop,
+  pickUpOntoSpace,
   pickUpPanel,
   space,
+  spaceDrop,
   spaceMenuButton,
   spaceMode,
   spaceTab,
@@ -126,13 +129,34 @@ test.describe('Window — the grid', () => {
     await page.keyboard.press('Escape')
 
     await chooseSpaceMenu(page, '')
-    // A row of one is already a column of one and one set of tabs.
-    await expect(menuItem(page, 'show-row')).toBeDisabled()
-    await expect(menuItem(page, 'show-column')).toBeDisabled()
-    await expect(menuItem(page, 'show-tabs')).toBeDisabled()
-    await expect(menuItem(page, 'show-desktop')).toBeEnabled()
+    // A row of one is already a column of one and one set of tabs — which the
+    // tick on "Row" says. None of the four greys out for it: three of them
+    // going dim at once would read as a space that may only be a row, while
+    // every one of them was perfectly true of it.
+    await expect(menuItem(page, 'show-row')).toHaveAttribute('aria-checked', 'true')
+    for (const id of ['show-row', 'show-column', 'show-tabs', 'show-desktop']) {
+      await expect(menuItem(page, id)).toBeEnabled()
+    }
 
     await menuItem(page, 'show-desktop').click()
+    await expect(floatFrame(page, 'items')).toHaveCount(1)
+  })
+
+  /*
+   * "Tabs" on a space of one pane is the one of the four with nowhere to go: a
+   * strip of one panel is not a space either, so it would leave that pane with
+   * no bar left to be shown another way from — and it holds content rather
+   * than panels, so it has none of its own to offer instead.
+   */
+  test('a space of one pane stays a space when it is told to be tabs', async ({ page }) => {
+    await gotoStory(page, SINGLE)
+
+    await chooseSpaceMenu(page, '', 'show-tabs')
+
+    await expect(space(page, '')).toHaveCount(1)
+    expect(await panelOrder(page)).toEqual(['items'])
+    // Still every way out of it, which is the whole point of the space.
+    await chooseSpaceMenu(page, '', 'show-desktop')
     await expect(floatFrame(page, 'items')).toHaveCount(1)
   })
 })
@@ -1112,12 +1136,23 @@ test.describe('Window — the space menu', () => {
     await expect(menuItem(page, 'show-desktop')).toHaveAttribute('aria-checked', 'false')
   })
 
-  test('an option that would change nothing cannot be taken', async ({ page }) => {
+  test('an option that would change nothing is offered all the same', async ({ page }) => {
     await gotoStory(page, PANE_MENU)
+    const before = await Promise.all([boxOf(page, 'sources'), boxOf(page, 'activity')])
+
     await chooseSpaceMenu(page, '1')
-    // Already a column: choosing "Column" has nothing to do.
-    await expect(menuItem(page, 'show-column')).toBeDisabled()
-    await expect(menuItem(page, 'show-row')).toBeEnabled()
+    // Already a column: the tick is what says so, and every one of the four is
+    // still there to be taken.
+    await expect(menuItem(page, 'show-column')).toHaveAttribute('aria-checked', 'true')
+    for (const id of ['show-row', 'show-column', 'show-tabs', 'show-desktop']) {
+      await expect(menuItem(page, id)).toBeEnabled()
+    }
+
+    await menuItem(page, 'show-column').click()
+
+    // And taking it leaves the layout exactly where it was.
+    const after = await Promise.all([boxOf(page, 'sources'), boxOf(page, 'activity')])
+    expect(after).toEqual(before)
   })
 
   test('flips the split between a row and a column', async ({ page }) => {
@@ -1183,9 +1218,9 @@ test.describe('Window — the space menu', () => {
     await expect(menuItem(page, 'show-row')).toHaveAttribute('aria-checked', 'false')
     await expect(menuItem(page, 'show-column')).toHaveAttribute('aria-checked', 'false')
     await expect(menuItem(page, 'show-desktop')).toHaveAttribute('aria-checked', 'false')
-    // Already tabs, so there is nothing to collapse — and every way out of
-    // them can be taken.
-    await expect(menuItem(page, 'show-tabs')).toBeDisabled()
+    // Already tabs, so "Tabs" has nothing to collapse — offered all the same,
+    // beside every way out of them.
+    await expect(menuItem(page, 'show-tabs')).toBeEnabled()
     await expect(menuItem(page, 'show-row')).toBeEnabled()
     await expect(menuItem(page, 'show-column')).toBeEnabled()
     await expect(menuItem(page, 'show-desktop')).toBeEnabled()
@@ -1313,7 +1348,7 @@ test.describe('Window — the space menu', () => {
     // Items divides its window with activity, top and bottom.
     await expect(menuItem(page, 'show-column')).toHaveAttribute('aria-checked', 'true')
     await expect(menuItem(page, 'show-desktop')).toHaveAttribute('aria-checked', 'false')
-    await expect(menuItem(page, 'show-column')).toBeDisabled()
+    await expect(menuItem(page, 'show-column')).toBeEnabled()
     await expect(menuItem(page, 'show-row')).toBeEnabled()
 
     await menuItem(page, 'show-row').click()
@@ -1333,9 +1368,10 @@ test.describe('Window — the space menu', () => {
     await expect(menus(page).first()).toBeVisible()
     // The first item takes the focus when a key opened the menu.
     await expect(menuItem(page, 'show-row')).toBeFocused()
-    // Down skips "Column", which is disabled because it is already a column.
+    // Down lands on "Column" — the one already in force is reached like any
+    // other, because nothing about it is out of bounds.
     await page.keyboard.press('ArrowDown')
-    await expect(menuItem(page, 'show-tabs')).toBeFocused()
+    await expect(menuItem(page, 'show-column')).toBeFocused()
 
     await page.keyboard.press('Escape')
     await expect(menus(page)).toHaveCount(0)
@@ -1606,6 +1642,259 @@ test.describe('Window — a space the layout named', () => {
   })
 })
 
+const SPACE_IN_A_SPACE = 'window-panel-grid--space-in-a-space'
+
+/*
+ * A space holding one space draws two bars over one content, and the model
+ * keeps that pair rather than collapsing it because the outer one is named —
+ * which is exactly what collapsing it would lose. So the menu on both bars
+ * asks the only question left: which of the two stays.
+ *
+ * Only ever as the merge that keeps every name there was. A name is the
+ * host's, and what keeps a named space whole through every operation that
+ * would otherwise dissolve it; an item that undid that with one click would
+ * make the rest of it worthless. Here the outer is named and the inner is not,
+ * so one merge is offered and it is the one that keeps *Workspace*.
+ */
+test.describe('Window — a space holding one space', () => {
+  /** What a space says on its own bar, by the path it sits at. */
+  const title = (page: Page, path: string) =>
+    space(page, path).locator('> .dc-space__head .dc-space__title')
+
+  /** The ids of the items under one heading, in the order they are offered. */
+  const under = (page: Page, heading: string) =>
+    menuGroup(page, heading).evaluateAll((all) => all.map((item) => item.dataset.dcItem))
+
+  test('draws both bars, and names the pair from either of them', async ({ page }) => {
+    await gotoStory(page, SPACE_IN_A_SPACE)
+    await expect(title(page, '1')).toHaveText('Workspace')
+    await expect(title(page, '1/0')).toHaveText('Column')
+
+    // From the outer bar the pair is the space this one is around, and the item
+    // names the bar that stays — never *this space*, which would say the same
+    // thing in both menus and mean the other one each time.
+    await spaceMenuButton(page, '1').click()
+    expect(await menuHeadings(page).allInnerTexts()).toEqual(['Workspace', 'Around Column'])
+    expect(await under(page, 'Around Column')).toEqual(['merge-around-keep-this'])
+    expect(await menuGroup(page, 'Around Column').allInnerTexts()).toEqual(['Keep Workspace'])
+
+    // From the inner bar it is the same pair, said from inside it — and the
+    // same merge, which from here is the one that keeps the bar around it.
+    await gotoStory(page, SPACE_IN_A_SPACE)
+    await spaceMenuButton(page, '1/0').click()
+    expect(await menuHeadings(page).allInnerTexts()).toEqual(['This space', 'Inside Workspace'])
+    expect(await under(page, 'Inside Workspace')).toEqual(['merge-inside-keep-that'])
+    expect(await menuGroup(page, 'Inside Workspace').allInnerTexts()).toEqual(['Keep Workspace'])
+  })
+
+  test('keeps the outer bar, the content arriving under its name', async ({ page }) => {
+    await gotoStory(page, SPACE_IN_A_SPACE)
+
+    await chooseSpaceMenu(page, '1', 'merge-around-keep-this')
+
+    // One bar where there were two, and it is the one that was named.
+    await expect(space(page, '1/0')).toHaveCount(0)
+    await expect(title(page, '1')).toHaveText('Workspace')
+    // In the shape the inner space was holding it: a column, still a column.
+    expect(await spaceMode(page, '1')).toBe('column')
+    const [items, sources, activity] = await Promise.all([
+      boxOf(page, 'items'),
+      boxOf(page, 'sources'),
+      boxOf(page, 'activity'),
+    ])
+    expect(activity.y).toBeGreaterThan(sources.y + sources.height - 1)
+    // Nothing left the space it was in — only the bar over it went, and the
+    // room that bar was taking went to the panes.
+    expect(sources.x).toBeGreaterThan(items.x + items.width - 1)
+  })
+
+  test('the same one choice from the inner bar, meaning the same thing', async ({ page }) => {
+    await gotoStory(page, SPACE_IN_A_SPACE)
+    await chooseSpaceMenu(page, '1/0', 'merge-inside-keep-that')
+    await expect(space(page, '1/0')).toHaveCount(0)
+    await expect(title(page, '1')).toHaveText('Workspace')
+    expect(await spaceMode(page, '1')).toBe('column')
+  })
+
+  test('never offers the merge that would take the name away', async ({ page }) => {
+    // The other way round is a menu item that unnames a space, which is the one
+    // thing a name is proof against everywhere else in the model.
+    await gotoStory(page, SPACE_IN_A_SPACE)
+    await spaceMenuButton(page, '1').click()
+    await expect(menuItem(page, 'merge-around-keep-that')).toHaveCount(0)
+
+    await gotoStory(page, SPACE_IN_A_SPACE)
+    await spaceMenuButton(page, '1/0').click()
+    await expect(menuItem(page, 'merge-inside-keep-this')).toHaveCount(0)
+  })
+
+  test('offers no merge at all where both halves are named', async ({ page }) => {
+    // Items dropped onto the desktop leaves the row holding that desktop and
+    // nothing else: a pair, with a name on each of its two bars. Neither can go
+    // without a name going too, so the menu is the four display modes again.
+    for (const path of ['', '0']) {
+      await gotoStory(page, FLOATING_MIXED)
+      await dragOntoDesktop(page, 'items', 40, 40)
+      await expect(title(page, '')).toHaveText('Top')
+      await expect(title(page, '0')).toHaveText('Right')
+
+      await spaceMenuButton(page, path).click()
+      await expect(menuHeadings(page)).toHaveCount(0)
+      const items = menus(page).first().locator('.dc-menu__item')
+      expect(await items.evaluateAll((all) => all.map((item) => item.dataset.dcItem))).toEqual([
+        'show-row',
+        'show-column',
+        'show-tabs',
+        'show-desktop',
+      ])
+    }
+  })
+
+  test('offers none of it where there is no pair to make one of', async ({ page }) => {
+    // Two children is an arrangement rather than a bar drawn twice, so the
+    // menu is the four choices and nothing to head them with.
+    await gotoStory(page, GRID)
+    await spaceMenuButton(page, '').click()
+    await expect(menuHeadings(page)).toHaveCount(0)
+    const items = menus(page).first().locator('.dc-menu__item')
+    expect(await items.evaluateAll((all) => all.map((item) => item.dataset.dcItem))).toEqual([
+      'show-row',
+      'show-column',
+      'show-tabs',
+      'show-desktop',
+    ])
+  })
+})
+
+/*
+ * A space is a place, and a place with nothing in it is still one. Drag the
+ * last pane out of a space the host named and the name stays where it was,
+ * with room under it — which is the whole of what a name is for, and would be
+ * worth nothing if the space went the moment it was empty.
+ */
+const EMPTY_SPACE = 'window-panel-grid--empty-space'
+
+test.describe('Window — a space with nothing left in it', () => {
+  /** What a space says on its own bar, by the path it sits at. */
+  const title = (page: Page, path: string) =>
+    space(page, path).locator('> .dc-space__head .dc-space__title')
+
+  /** The named desktop of the mixed story, its windows dragged off one by one. */
+  const emptied = async (page: Page) => {
+    await gotoStory(page, FLOATING_MIXED)
+    for (const id of ['sources', 'activity', 'notes']) await dragPanel(page, id, 'items', 'bottom')
+    await expect(space(page, '1').locator('.dc-pane')).toHaveCount(0)
+  }
+
+  test('stays where it was, named, after the last window is dragged off it', async ({ page }) => {
+    await emptied(page)
+    await expect(title(page, '1')).toHaveText('Right')
+    expect(await spaceMode(page, '1')).toBe('desktop')
+
+    // And with the room it was given: what emptied is the space, not its share
+    // of the row around it.
+    const [left, right] = await Promise.all([
+      space(page, '0').boundingBox(),
+      space(page, '1').boundingBox(),
+    ])
+    if (!left || !right) throw new Error('Both spaces should be on screen')
+    expect(right.width).toBeGreaterThan(left.width)
+  })
+
+  test('takes a window back, the drop naming it by where it is', async ({ page }) => {
+    await emptied(page)
+
+    // No panel on the desktop to be dropped against, so the drop names the
+    // desktop by the path it is rendered at — and previews the window it makes.
+    await pickUpOntoDesktop(page, 'notes', 60, 40)
+    await expect(desktopDrop(page)).toHaveCount(1)
+    await dropPanel(page)
+
+    await expect(frameAtPath(page, '1/0')).toHaveCount(1)
+    await expect(frameAtPath(page, '1/0')).toContainText('Notes')
+    await expect(title(page, '1')).toHaveText('Right')
+  })
+
+  test('takes a pane back where it is tiled rather than a desktop', async ({ page }) => {
+    await emptied(page)
+    await chooseSpaceMenu(page, '1', 'show-row')
+    expect(await spaceMode(page, '1')).toBe('row')
+
+    // A row with nothing in it has no edge to land either side of, so what the
+    // preview says is that this space is the one about to be filled.
+    await pickUpOntoSpace(page, 'notes', '1')
+    await expect(spaceDrop(page)).toHaveCount(1)
+    await dropPanel(page)
+
+    await expect(space(page, '1').locator('.dc-pane')).toHaveCount(1)
+    await expect(title(page, '1')).toHaveText('Right')
+    await expect(space(page, '1').locator('.dc-pane')).toContainText('Notes')
+  })
+
+  test('is still shown three of the four ways, and named in all of them', async ({ page }) => {
+    const shapes = [
+      { item: 'show-row', mode: 'row' },
+      { item: 'show-column', mode: 'column' },
+      // A strip is said by its tabs, so a strip of none is no space at all —
+      // the one shape an empty space cannot be shown in. Choosing it leaves
+      // this one exactly as it was rather than taking it away.
+      { item: 'show-tabs', mode: 'desktop' },
+      { item: 'show-desktop', mode: 'desktop' },
+    ]
+
+    for (const shape of shapes) {
+      await gotoStory(page, EMPTY_SPACE)
+      await chooseSpaceMenu(page, '1', shape.item)
+      await expect(title(page, '1')).toHaveText('Right')
+      expect(await spaceMode(page, '1')).toBe(shape.mode)
+
+      // And back to the desktop it was, which is the way back for all of them.
+      await chooseSpaceMenu(page, '1', 'show-desktop')
+      await expect(title(page, '1')).toHaveText('Right')
+      expect(await spaceMode(page, '1')).toBe('desktop')
+    }
+  })
+
+  test('an arrow key walks a pane into it, named by where it landed', async ({ page }) => {
+    await gotoStory(page, EMPTY_SPACE)
+    // Shown tiled, so what lands there is a pane of the row: a panel that
+    // lands on a *desktop* is a window on it, which the next case is about.
+    await chooseSpaceMenu(page, '1', 'show-row')
+
+    await grip(page, 'sources').focus()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('ArrowRight')
+
+    // Announced against the space rather than a panel, there being none in it
+    // to announce it against — which is the whole of what is different here.
+    await expect(page.locator('.dc-window__live')).toContainText('Sources moved right, into Right')
+    await expect(space(page, '1').locator('.dc-pane')).toContainText('Sources')
+    await expect(title(page, '1')).toHaveText('Right')
+    // Still in move mode on the panel that moved, so moves can be chained.
+    await expect(grip(page, 'sources')).toBeFocused()
+  })
+
+  test('shift and an arrow say the same thing, there being nothing to tab with', async ({ page }) => {
+    await gotoStory(page, EMPTY_SPACE)
+    await grip(page, 'items').focus()
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Shift+ArrowRight')
+
+    await expect(page.locator('.dc-window__live')).toContainText('Items moved right, into Right')
+    await expect(frameAtPath(page, '1/0')).toContainText('Items')
+  })
+
+  test('and a pane dropped into it can be carried straight out again', async ({ page }) => {
+    await emptied(page)
+    await dragOntoSpace(page, 'notes', '1')
+    await expect(space(page, '1').locator('.dc-pane')).toHaveCount(1)
+
+    await dragPanel(page, 'notes', 'items', 'bottom')
+    await expect(title(page, '1')).toHaveText('Right')
+    await expect(space(page, '1').locator('.dc-pane')).toHaveCount(0)
+  })
+})
+
 test.describe('Window — a window holding a desktop', () => {
   /** The row shown as a desktop: items at `0`, the desktop's window at `1`. */
   const asWindows = async (page: Page) => {
@@ -1749,7 +2038,7 @@ test.describe('Window — a desktop as a tab', () => {
     // From the items tab, the menu is about the strip: these panes are tabs.
     await openPaneMenu(page, 'items')
     await expect(menuItem(page, 'show-tabs')).toHaveAttribute('aria-checked', 'true')
-    await expect(menuItem(page, 'show-tabs')).toBeDisabled()
+    await expect(menuItem(page, 'show-tabs')).toBeEnabled()
     await page.keyboard.press('Escape')
 
     await spaceTab(page, 'Right').click()
@@ -1757,7 +2046,7 @@ test.describe('Window — a desktop as a tab', () => {
     // From the desktop's tab it is about the desktop: windows is what it is.
     await paneMenuButton(page, 'items').click()
     await expect(menuItem(page, 'show-desktop')).toHaveAttribute('aria-checked', 'true')
-    await expect(menuItem(page, 'show-desktop')).toBeDisabled()
+    await expect(menuItem(page, 'show-desktop')).toBeEnabled()
     await expect(menuItem(page, 'show-row')).toBeEnabled()
     // And the two ways back along the strip are on it either way.
     await expect(menuItem(page, 'next-tab')).toBeEnabled()
@@ -2056,6 +2345,19 @@ test.describe('Window — the menu bar', () => {
 
     await expect(menus(page)).toHaveCount(2)
     await expect(page.locator('.dc-menu__item', { hasText: 'items.json' })).toBeDisabled()
+  })
+
+  test('the keyboard passes over a disabled item', async ({ page }) => {
+    await gotoStory(page, WORKBENCH)
+    // Nothing left to close, so a host item goes disabled — and it is the last
+    // one in the menu, so Up from the first wraps past it onto the one before.
+    await chooseMenu(page, 'File', 'close-all')
+    await menubarItem(page, 'File').focus()
+
+    await page.keyboard.press('ArrowDown')
+    await expect(menuItem(page, 'new-note')).toBeFocused()
+    await page.keyboard.press('ArrowUp')
+    await expect(menuItem(page, 'reset')).toBeFocused()
   })
 })
 

@@ -408,6 +408,26 @@ export async function dragOntoDesktop(
 /** The outline showing the window a drop on bare desktop would make. */
 export const desktopDrop = (page: Page): Locator => page.locator('.dc-window__drop')
 
+/** The pane a drop into a space that holds nothing would fill it with. */
+export const spaceDrop = (page: Page): Locator => page.locator('.dc-space__drop')
+
+/**
+ * Carries a panel over the middle of a space, named by the path it sits at —
+ * how a space with nothing in it is aimed at, having no pane to aim for.
+ */
+export async function pickUpOntoSpace(page: Page, id: string, path: string): Promise<void> {
+  const box = await space(page, path).boundingBox()
+  if (!box) throw new Error(`No space at ${path}`)
+  await pressPanel(page, id)
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 12 })
+}
+
+/** Carries a panel into a space and lets go. */
+export async function dragOntoSpace(page: Page, id: string, path: string): Promise<void> {
+  await pickUpOntoSpace(page, id, path)
+  await page.mouse.up()
+}
+
 /* ------------------------------------------------------------------ spaces */
 
 /**

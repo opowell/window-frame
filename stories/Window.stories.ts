@@ -594,8 +594,10 @@ const story2 = (args: WorkbenchStoryArgs) => ({
  * **Column** holding sources and activity — because that space is a panel in
  * its own right, holding panels where a pane holds content.
  *
- * The one already true is ticked and cannot be taken, so the menu says the
- * same thing wherever it is opened from. Exactly one of the four is ever
+ * The one already true is ticked, and that tick is all that says so: none of
+ * the four is ever hidden and none is ever greyed out, since a display mode
+ * greyed out reads as one the space may not be shown in rather than the one it
+ * already is. Choosing it does nothing. Exactly one of the four is ever
  * ticked, since each space answers only for itself.
  *
  * None of the three panes offers any of it. Items, sources and activity each
@@ -722,6 +724,86 @@ export const NamedStripPlain = story({
     'Top',
   ),
   spaceNames: false,
+  movable: true,
+  content: CONTENT,
+})
+
+/**
+ * **Two bars over one content.** The space on the right is called *Workspace*
+ * and holds one thing: the column of sources and activity. Both of them are
+ * spaces, so both draw a bar — and the second says nothing the first did not,
+ * since the panes under the two of them are the same panes.
+ *
+ * A space holding one space is the only nesting the model keeps. A split of one
+ * child is collapsed into that child everywhere else, so a pair that is still
+ * here is one the host meant: it has a name, a bar it draws or does not, or the
+ * desktop it remembers being — and collapsing it is exactly what would lose
+ * that.
+ *
+ * Which leaves one question, and the menu on either bar asks it: **which of the
+ * two bars stays**. *Keep Workspace* leaves the column's panes under the outer
+ * name, and it is the only merge offered here: the other way round would leave
+ * the column and take the name away, and a name is not something a menu click
+ * takes. Where *both* halves are named neither can go, so nothing is offered
+ * and the pair stays a pair.
+ *
+ * Nothing else moves either way — the content was only ever the inner space's,
+ * so the choice is which bar it is left under. The items pane beside them is
+ * untouched, being nobody's only child.
+ *
+ * `mergeSpace` is the operation and takes either half, `onlySpace` is the pair
+ * it acts on, and a host that means to drop a name can still say so.
+ */
+export const SpaceInASpace = story({
+  panels: [ITEMS, SOURCES, ACTIVITY],
+  layout: row(
+    [
+      panelNode('items'),
+      row([column([panelNode('sources'), panelNode('activity')])], undefined, 'Workspace'),
+    ],
+    [0.6, 0.4],
+  ),
+  movable: true,
+  content: CONTENT,
+})
+
+/**
+ * **A space with nothing in it.** *Right* is a named desktop with no windows on
+ * it. Drag either pane beside it onto the desktop and off again: the space is
+ * where it was both times, keeping its name and its half of the row.
+ *
+ * A space the host named is a place rather than a container, so it outlives
+ * what was in it. `removePanel` and `normalizeLayout` keep it the way they keep
+ * it whole against every other shape it could be dissolved into — otherwise a
+ * name would last exactly as long as the last pane in it, and the pane dragged
+ * out would take it with nothing on screen to say why.
+ *
+ * The way back is the other half of that. A drop into a space holding nothing
+ * has no panel there to land against, so it names the space by where it is:
+ * `dropIntoSpace`, the path-addressed twin of `floatPanel`. A desktop takes the
+ * panel as a window, a row or a column as the one pane it has not got — and the
+ * preview says which space is about to be filled, there being no edge in it to
+ * land on one side of.
+ *
+ * The keyboard reaches it the same way. Pick a pane up by its grip and the
+ * arrow that way walks it in, announced against the space rather than against
+ * a panel in it; shift and that arrow say the same thing, since *beside* what
+ * is there and *with* what is there are one place when there is nothing there.
+ *
+ * A *strip* is the one shape this does not apply to. What says a strip's name
+ * is its tabs, so a strip with none has no bar left to say anything on and
+ * nothing to drop into: it goes, as it always did. Which leaves **Tabs** the
+ * one of the four this space cannot be shown in — choosing it leaves *Right*
+ * exactly as it is, rather than taking it away. The other three each draw a
+ * bar of their own, and say the name on it.
+ */
+export const EmptySpace = story({
+  panels: [ITEMS, SOURCES],
+  layout: row(
+    [column([panelNode('items'), panelNode('sources')], undefined, 'Left'), float([], 'Right')],
+    [0.55, 0.45],
+    'Top',
+  ),
   movable: true,
   content: CONTENT,
 })

@@ -14,9 +14,16 @@ import type {
 export interface DropTarget {
   /**
    * A panel of the group being dropped on — or, for a `float` drop, of the
-   * float being dropped onto. Never the one being dragged.
+   * float being dropped onto. Never the one being dragged, and `''` where the
+   * space being dropped into holds no panel to be named by: `space` names it.
    */
   panel: string
+  /**
+   * The space being dropped into, by the path it is rendered at — set only for
+   * a space that holds nothing at all, which is the one drop no panel can say
+   * where it lands.
+   */
+  space?: readonly number[]
   edge: DropEdge
   /** The gap in that group's tab strip, when the strip is what is under the pointer. */
   index?: number
@@ -122,8 +129,9 @@ export interface WindowContext {
   /**
    * The menu a pane offers: whatever the content inside it registered, then
    * how its space is shown, which tab is on top, and whether it can be closed.
-   * The window's own half is built from what the layout actually allows, so an
-   * option that would do nothing is offered as disabled rather than hidden.
+   * The window's own half is read back off the layout, so which display mode a
+   * space is in is said by the tick beside it — never by greying the other
+   * three, and never by leaving one out.
    */
   menuFor(id: string): MenuItemDef[]
   /**

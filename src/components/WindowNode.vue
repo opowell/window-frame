@@ -155,18 +155,38 @@ const dock = computed(() => {
   return places
 })
 
+/** Whether a drop target names this very space, by the path it was rendered at. */
+const targeted = (space: readonly number[] | undefined): boolean =>
+  !!space && space.join('/') === props.path.join('/')
+
 /**
  * The window a drop on this float's bare desktop would make. The drop names a
  * panel on the desktop it means, so this checks the innermost frame holding
  * that panel is one of *this* float's — otherwise a float nested inside one of
  * them would have both draw the same preview.
+ *
+ * A desktop with nothing on it has no panel to be named by and is named by its
+ * path instead, which says which desktop is meant just as exactly.
  */
 const dropFrame = computed(() => {
   const target = win.dropTarget.value
   const node = floating.value
   if (!node || !target?.rect || target.edge !== 'float') return null
+  if (target.space) return targeted(target.space) ? target.rect : null
   const innermost = frameOf(node, target.panel)
   return innermost && node.frames.includes(innermost) ? target.rect : null
+})
+
+/**
+ * Whether a drop would put a panel into this space, which is holding nothing.
+ *
+ * Drawn where the panes would be rather than as an outline over them, because
+ * there are none: what the preview says is that this empty space is the one
+ * about to be filled, and the space is all there is to say it on.
+ */
+const dropInto = computed(() => {
+  const target = win.dropTarget.value
+  return !!target && !target.rect && targeted(target.space)
 })
 const horizontal = computed(() => split.value?.direction === 'row')
 
@@ -367,6 +387,11 @@ function onGutterKey(event: KeyboardEvent, index: number) {
       class="dc-window__split"
       :data-dc-direction="split.direction"
     >
+      <div
+        v-if="dropInto"
+        class="dc-space__drop"
+        aria-hidden="true"
+      />
       <template
         v-for="(child, index) in children"
         :key="keyFor(child)"
@@ -455,6 +480,19 @@ function onGutterKey(event: KeyboardEvent, index: number) {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+/*
+ * A space about to be filled, drawn where its one pane would go — the whole of
+ * it, since a space with nothing in it has no edge to land on either side of.
+ */
+.dc-space__drop {
+  flex: 1;
+  border: 1px dashed var(--dc-accent);
+  border-radius: var(--dc-radius);
+  background: var(--dc-accent-bg);
+  opacity: 0.75;
+  pointer-events: none;
 }
 
 /*

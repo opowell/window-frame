@@ -49,7 +49,7 @@ export function usePaneContext(): PaneContext | null {
  *
  * `items` is read each time the menu is built, so pass a getter or a computed
  * and the items say what is true *now* — a tick beside the view the content is
- * actually showing, an option disabled while it would do nothing:
+ * actually showing, a label that follows what is under it:
  *
  * ```ts
  * usePaneMenu(() => [

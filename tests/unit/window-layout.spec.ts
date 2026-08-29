@@ -10,6 +10,7 @@ import {
   column,
   DEFAULT_FRAME,
   defaultLayout,
+  dropIntoSpace,
   fixedView,
   float,
   floatPanel,
@@ -32,6 +33,7 @@ import {
   isTabOf,
   maximizeFrame,
   maximizeFrameAt,
+  mergeSpace,
   minimizeFrame,
   minimizeFrameAt,
   movePanel,
@@ -40,6 +42,7 @@ import {
   nodeTitle,
   normalizeLayout,
   normalizeSizes,
+  onlySpace,
   panelIds,
   panelNode,
   panelTabs,
@@ -1833,5 +1836,190 @@ describe('fixed and headless spaces', () => {
       kind: 'float',
       headless: true,
     })
+  })
+})
+
+describe('two bars over one content', () => {
+  /** A named space holding one space: the pair either bar can be left out of. */
+  const nested = () => row([column([panelNode('b'), panelNode('c')])], undefined, 'Workspace')
+
+  it('finds the one space a space holds', () => {
+    const pair = nested()
+    expect(onlySpace(pair)).toBe(pair.children[0])
+
+    // A strip is one half as readily as a split is: its only tab is a space.
+    const strip = group([column([panelNode('b'), panelNode('c')])], undefined, 'Workspace')
+    expect(onlySpace(strip)).toBe(strip.panels[0])
+
+    // Tabs are a space in their own right, so a space holding a strip of them
+    // is a pair too.
+    expect(onlySpace(headless(row([group(['b', 'c'])])))).toMatchObject({
+      kind: 'group',
+      panels: ['b', 'c'],
+    })
+  })
+
+  it('says no to everything that is not a pair', () => {
+    // More than one child is an arrangement rather than a bar drawn twice.
+    expect(onlySpace(grid())).toBeNull()
+    expect(onlySpace(group(['a', 'b']))).toBeNull()
+    // A lone pane is not a space: what is under its header is content.
+    expect(onlySpace(row([panelNode('a')]))).toBeNull()
+    expect(onlySpace(panelNode('a'))).toBeNull()
+    // A window is placed over a desktop rather than dividing it, so a desktop
+    // of one window is a desktop with a window on it.
+    expect(onlySpace(float([frame(column([panelNode('b'), panelNode('c')]))]))).toBeNull()
+  })
+
+  it('keeps the outer bar, and the content arrives under its name', () => {
+    const merged = mergeSpace(nested(), 'outer')
+    expect(shape(merged)).toBe('column(b, c)')
+    expect(merged).toMatchObject({ title: 'Workspace' })
+
+    // The shape is the inner space's, whatever the outer was showing: a strip
+    // stays a strip, and the name is said in front of its tabs instead.
+    const tabs = mergeSpace(row([group(['b', 'c'])], undefined, 'Workspace'), 'outer')
+    expect(tabs).toMatchObject({ kind: 'group', panels: ['b', 'c'], title: 'Workspace' })
+  })
+
+  it('drops what the inner said about a bar that is no longer drawn', () => {
+    const merged = mergeSpace(
+      row([fixedView(headless(column([panelNode('b'), panelNode('c')])))], undefined, 'Workspace'),
+      'outer',
+    )
+    // One bar is left and it is the outer's, so what it says is the outer's
+    // too — all three of the things a space says about the bar it draws.
+    expect(merged).toEqual(column([panelNode('b'), panelNode('c')], undefined, 'Workspace'))
+  })
+
+  it('keeps the inner bar, exactly as it was', () => {
+    const pair = headless(nested())
+    // Nothing is rebuilt: the space that stays is the one that was there.
+    expect(mergeSpace(pair, 'inner')).toBe(pair.children[0])
+    expect(mergeSpace(pair, 'inner')).not.toMatchObject({ title: 'Workspace' })
+  })
+
+  it('leaves a space it has nothing to merge exactly as it was', () => {
+    const tree = grid()
+    expect(mergeSpace(tree, 'outer')).toBe(tree)
+    expect(mergeSpace(tree, 'inner')).toBe(tree)
+  })
+
+  it('leaves the same content behind whichever bar is kept', () => {
+    const tree = row([panelNode('a'), nested()])
+    const held = tree.children[1]!
+    const outer = normalizeLayout(replaceAt(tree, [1], mergeSpace(held, 'outer')))
+    const inner = normalizeLayout(replaceAt(tree, [1], mergeSpace(held, 'inner')))
+
+    expect(shape(outer)).toBe('row(a, column(b, c))')
+    expect(shape(inner)).toBe(shape(outer))
+    // Only the name tells them apart — which is the whole of the choice.
+    expect(asSplit(outer).children[1]).toMatchObject({ title: 'Workspace' })
+    expect(asSplit(inner).children[1]!.title).toBeUndefined()
+  })
+
+  it('is one space afterwards, and offers no second merge', () => {
+    expect(onlySpace(mergeSpace(nested(), 'outer'))).toBeNull()
+    expect(onlySpace(mergeSpace(nested(), 'inner'))).toBeNull()
+  })
+})
+
+describe('a space with nothing left in it', () => {
+  /** A desktop called `Right` beside a pane, the pair of them in a row. */
+  const beside = () =>
+    row([panelNode('a'), float([frame(panelNode('b'), { x: 20, y: 20 })], 'Right')], [0.4, 0.6])
+
+  it('keeps a named space its last pane was dragged out of', () => {
+    const left = removePanel(beside(), 'b')
+    expect(shape(left)).toBe('row(a, float())')
+    expect(nodeAt(left!, [1])).toMatchObject({ kind: 'float', frames: [], title: 'Right' })
+    // Its share of the row is its own too: what emptied is the space, not the
+    // room it was given.
+    expect(sizesOf(asSplit(left)).map((size) => Math.round(size * 100))).toEqual([40, 60])
+  })
+
+  it('drops the same space where the host said nothing about it', () => {
+    const plain = row([panelNode('a'), float([frame(panelNode('b'))])])
+    expect(shape(removePanel(plain, 'b'))).toBe('a')
+    // The three things a space says about its bar each keep it, a name being
+    // only the loudest of them.
+    expect(shape(removePanel(row([panelNode('a'), headless(float([frame(panelNode('b'))]))]), 'b')))
+      .toBe('row(a, float())')
+    expect(
+      shape(removePanel(row([panelNode('a'), fixedView(column([panelNode('b')]))]), 'b')),
+    ).toBe('row(a, column())')
+  })
+
+  it('keeps it through a tidy-up as well as through the move that emptied it', () => {
+    const emptied = row([panelNode('a'), float([], 'Right')], [0.4, 0.6])
+    expect(shape(normalizeLayout(emptied))).toBe('row(a, float())')
+    expect(nodeAt(normalizeLayout(emptied), [1])).toMatchObject({ title: 'Right' })
+    // And drops one that says nothing, which is what it always did.
+    expect(shape(normalizeLayout(row([panelNode('a'), float([])])))).toBe('a')
+  })
+
+  it('lets a strip go all the same, having no bar left to be named on', () => {
+    // What says a strip's name is its tabs: with none there is nothing to draw.
+    expect(removePanel(group(['b'], undefined, 'Right'), 'b')).toBeNull()
+    expect(shape(removePanel(row([panelNode('a'), group(['b'], undefined, 'Right')]), 'b'))).toBe('a')
+  })
+
+  it('is the last space in the window as readily as any other', () => {
+    expect(removePanel(float([frame(panelNode('a'))], 'Right'), 'a')).toMatchObject({
+      kind: 'float',
+      frames: [],
+      title: 'Right',
+    })
+    // Nothing said about it, and nothing in it: there is no window left.
+    expect(removePanel(float([frame(panelNode('a'))]), 'a')).toBeNull()
+  })
+})
+
+describe('dropIntoSpace', () => {
+  const emptied = () => row([panelNode('a'), float([], 'Right')], [0.4, 0.6])
+
+  it('puts a panel onto a desktop that has nothing on it', () => {
+    const next = dropIntoSpace(emptied(), 'a', [1], { x: 30, y: 40, w: 200, h: 160 })
+    // The row went with the pane that left it, leaving the desktop it was
+    // beside — with the panel on it as a window at the rect the drop worked out.
+    expect(shape(next)).toBe('float(a@30,40 200x160)')
+    expect(next).toMatchObject({ title: 'Right' })
+  })
+
+  it('reads the path from the tree it was given, not the one it leaves', () => {
+    // Lifting `a` out first shifts every child of the row along one, so a path
+    // read before the move and used after it would name the desktop beside the
+    // one meant. Both halves happen in one walk, which is what keeps `[1]` true.
+    const tree = row([panelNode('a'), float([], 'Right'), float([], 'Other')])
+    const next = asSplit(dropIntoSpace(tree, 'a', [1], { x: 8, y: 8, w: 120, h: 90 }))
+    expect(shape(next)).toBe('row(float(a@8,8 120x90), float())')
+    expect(next.children[0]).toMatchObject({ title: 'Right' })
+    expect(next.children[1]).toMatchObject({ title: 'Other' })
+  })
+
+  it('gives a tiled space the one pane it has not got', () => {
+    const tree = row([panelNode('a'), panelNode('b'), column([], undefined, 'Right')])
+    const next = dropIntoSpace(tree, 'b', [2])
+    expect(shape(next)).toBe('row(a, column(b))')
+    expect(nodeAt(next, [1])).toMatchObject({ title: 'Right' })
+  })
+
+  it('is added to what is there, never put in its place', () => {
+    // A space with no panel in it can still hold a space with none — and that
+    // one has a name of its own, which the pane arriving does not write over.
+    const nested = row([panelNode('a'), row([float([], 'Right')], undefined, 'Top')])
+    const next = dropIntoSpace(nested, 'a', [1])
+    expect(shape(next)).toBe('row(float(), a)')
+    expect(nodeAt(next, [0])).toMatchObject({ title: 'Right' })
+    expect(next).toMatchObject({ title: 'Top' })
+  })
+
+  it('leaves the layout alone where the drop has nowhere to land', () => {
+    const tree = emptied()
+    // A path naming no space at all, and one naming a space with a pane in it:
+    // a drop into a space is the way back into an empty one and nothing else.
+    expect(dropIntoSpace(tree, 'a', [4])).toBe(tree)
+    expect(dropIntoSpace(tree, 'a', [0])).toBe(tree)
+    expect(dropIntoSpace(tree, 'z', [1])).toBe(tree)
   })
 })

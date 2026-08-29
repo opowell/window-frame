@@ -32,8 +32,10 @@ import {
   activeTab,
   clampRect,
   collapseSpace,
+  collapseToTabs,
   hasPanel,
   DEFAULT_FRAME,
+  dropIntoSpace,
   floatPanel,
   floatSplit,
   floatTabs,
@@ -44,15 +46,18 @@ import {
   groupOf,
   isFloat,
   isGroup,
-  isSplit,
+  isPanelTab,
   isMaximized,
   isMinimized,
   maximizeFrameAt,
   minimizeFrameAt,
   moveTab,
   movePanel,
+  mergeSpace,
   nodeAt,
   normalizeLayout,
+  onlySpace,
+  placesOf,
   raisedPath,
   raiseFrameAt,
   reconcileLayout,
@@ -63,6 +68,7 @@ import {
   setFrameRect,
   setFrameRectAt,
   setSizesAt,
+  spaceTitle,
   spreadTabs,
   swapPanels,
   tileFloat,
@@ -378,8 +384,9 @@ function targetAt(x: number, y: number, dragged: string): DropTarget | null {
     if (!panel) return null
     return { panel, edge: edgeAt(box, x, y) }
   }
-  // Over no pane at all: a float's bare desktop takes the panel as a window.
-  return desktopTargetAt(x, y, dragged)
+  // Over no pane at all: a float's bare desktop takes the panel as a window,
+  // and a tiled space with nothing in it takes it as the pane it has not got.
+  return desktopTargetAt(x, y, dragged) ?? emptySpaceAt(x, y)
 }
 
 /** The floats on screen, innermost first — a nested one is inside its parent. */
@@ -409,8 +416,11 @@ function desktopTargetAt(x: number, y: number, dragged: string): DropTarget | nu
 
     // Named by something already on this desktop, and never by the panel in
     // flight: a panel cannot be dropped relative to itself.
-    const near = panesIn(desktop).flatMap((pane) => pane.panels).find((id) => id !== dragged)
-    if (!near) return null
+    const panes = panesIn(desktop)
+    const near = panes.flatMap((pane) => pane.panels).find((id) => id !== dragged)
+    // Somewhere to put it, but nothing to name it by: the only window on this
+    // desktop is the one being carried, and it is already where it would land.
+    if (!near && panes.length > 0) return null
 
     const from = findFrame(current, dragged)?.rect
     const rect = clampRect(
@@ -423,7 +433,56 @@ function desktopTargetAt(x: number, y: number, dragged: string): DropTarget | nu
       { w: desktop.clientWidth, h: desktop.clientHeight },
       props.minPanelSize,
     )
-    return { panel: near, edge: 'float', rect }
+    if (near) return { panel: near, edge: 'float', rect }
+    // A desktop with nothing on it is still a desktop — a named one at that,
+    // or normalizing would have dropped it — so the window a drop makes is the
+    // way back onto it. There is no panel to say which desktop is meant, so
+    // the path it was rendered at says it.
+    const space = spacePathOf(desktop)
+    return space ? { panel: '', space, edge: 'float', rect } : null
+  }
+  return null
+}
+
+/** The path a space was rendered at, read off the element drawing it. */
+function spacePathOf(element: HTMLElement): number[] | null {
+  const value = element.closest<HTMLElement>('.dc-space')?.getAttribute('data-dc-path')
+  if (value === null || value === undefined) return null
+  return value === '' ? [] : value.split('/').map(Number)
+}
+
+/**
+ * The spaces on screen with nothing in them, innermost first — the places a
+ * panel can land that no panel can name, there being none in them to name one
+ * by. Both a drag and a keyboard move end up here.
+ */
+function emptySpaces(): { element: HTMLElement; path: number[] }[] {
+  const container = root.value
+  if (!container) return []
+  return [...container.querySelectorAll<HTMLElement>('.dc-space')]
+    .filter((element) => element.closest('.dc-window') === container)
+    .filter((element) => !element.querySelector('.dc-pane'))
+    .reverse()
+    .flatMap((element) => {
+      const path = spacePathOf(element)
+      return path ? [{ element, path }] : []
+    })
+}
+
+/**
+ * A drop into a tiled space that holds nothing: the row or the column a named
+ * space is still drawing after the last pane was dragged out of it.
+ *
+ * The desktops are answered for above, having a rect to work out as well; what
+ * is left is the spaces that divide rather than stack, and a drop into one is
+ * the pane it is left holding.
+ */
+function emptySpaceAt(x: number, y: number): DropTarget | null {
+  for (const { element, path } of emptySpaces()) {
+    if (element.dataset.dcSpace === 'desktop') continue
+    const box = element.getBoundingClientRect()
+    if (x < box.left || x > box.right || y < box.top || y > box.bottom) continue
+    return { panel: '', space: path, edge: 'center' }
   }
   return null
 }
@@ -503,15 +562,19 @@ function beginDrag(id: string, event: PointerEvent) {
     const current = resolved.value
     if (drop && started && target && current) {
       // A drop on bare desktop makes a window rather than dividing a group,
-      // so it is the one drop `movePanel` is not the operation for.
-      const next =
-        target.edge === 'float' && target.rect
+      // so it is the one drop `movePanel` is not the operation for — and a
+      // drop into a space with nothing in it is the other, there being no
+      // panel there to put this one against.
+      const next = target.space
+        ? dropIntoSpace(current, id, target.space, target.rect)
+        : target.edge === 'float' && target.rect
           ? floatPanel(current, id, target.panel, target.rect)
           : movePanel(current, id, target.panel, target.edge, target.index)
       apply(next, {
         panel: id,
         target: target.panel,
         edge: target.edge,
+        ...(target.space === undefined ? {} : { space: target.space }),
         ...(target.index === undefined ? {} : { index: target.index }),
         ...(target.rect === undefined ? {} : { rect: target.rect }),
       })
@@ -833,24 +896,34 @@ onBeforeUnmount(() => releaseFrame?.())
 /* ---------------------------------------------------------------- keyboard */
 
 /**
+ * Where a keyboard move lands: the pane that way, named by a panel in it, or
+ * the space that way with nothing in it, named by where it is — the same two
+ * things a drop can be aimed at, found by direction rather than by pointer.
+ */
+type Neighbour = { panel: string; space?: undefined } | { panel?: undefined; space: number[] }
+
+/**
  * The pane next to this one in a direction: the nearest that overlaps it on
  * the other axis, so "left" from a tall pane finds whichever of the stack
  * beside it is level with it — the top one.
+ *
+ * A space holding nothing is one of the places that way too, and the only one
+ * with no panel to be named by. It is looked at after the panes, so a pane
+ * exactly as far away wins: it is the more particular answer of the two, an
+ * edge of it being somewhere a panel can land rather than the whole of it.
  */
-function neighbourOf(id: string, direction: MoveDirection): string | null {
+function neighbourOf(id: string, direction: MoveDirection): Neighbour | null {
   const home = paneOf(id)
   const from = home?.element.getBoundingClientRect()
   if (!home || !from) return null
   const horizontal = direction === 'left' || direction === 'right'
 
-  let best: { id: string; distance: number } | null = null
-  for (const pane of paneElements()) {
-    if (pane === home || pane.element === home.element) continue
-    const box = pane.element.getBoundingClientRect()
+  /** How far past this pane's edge the box is, or `null` if it is not that way. */
+  const reach = (box: DOMRect): number | null => {
     const overlaps = horizontal
       ? box.bottom > from.top + 1 && box.top < from.bottom - 1
       : box.right > from.left + 1 && box.left < from.right - 1
-    if (!overlaps) continue
+    if (!overlaps) return null
 
     const distance =
       direction === 'left'
@@ -861,15 +934,31 @@ function neighbourOf(id: string, direction: MoveDirection): string | null {
             ? from.top - box.bottom
             : box.top - from.bottom
     // Negative means it is on the other side of the pane entirely.
-    if (distance < -1) continue
+    return distance < -1 ? null : distance
+  }
 
+  const found: { to: Neighbour; distance: number }[] = []
+
+  for (const pane of paneElements()) {
+    if (pane === home || pane.element === home.element) continue
+    const distance = reach(pane.element.getBoundingClientRect())
+    if (distance === null) continue
     // Named by a panel that is not the one being moved, since a panel cannot
     // be moved relative to itself.
     const panel = pane.panels.find((other) => other !== id)
-    if (!panel) continue
-    if (!best || distance < best.distance) best = { id: panel, distance }
+    if (panel) found.push({ to: { panel }, distance })
   }
-  return best?.id ?? null
+
+  for (const { element, path } of emptySpaces()) {
+    const distance = reach(element.getBoundingClientRect())
+    if (distance !== null) found.push({ to: { space: path }, distance })
+  }
+
+  const nearest = found.reduce<{ to: Neighbour; distance: number } | null>(
+    (best, candidate) => (best && best.distance <= candidate.distance ? best : candidate),
+    null,
+  )
+  return nearest?.to ?? null
 }
 
 function toggleMoveMode(id: string) {
@@ -903,6 +992,11 @@ const EDGE_FOR: Record<MoveDirection, Exclude<DropEdge, 'center'>> = {
  * into the neighbour that way as a tab. Along a strip of tabs the arrows
  * reorder the strip first, and only take the panel out of the group once it is
  * at the end of it.
+ *
+ * A space with nothing in it is a place that way like any other, and the one
+ * where both arrows mean the same thing: *beside* what is there and *with*
+ * what is there are the same place when there is nothing there, so shift is
+ * not refused, it simply has nothing extra to say.
  */
 function nudge(id: string, direction: MoveDirection, join = false) {
   if (!canMove(id)) return
@@ -925,21 +1019,37 @@ function nudge(id: string, direction: MoveDirection, join = false) {
   }
 
   const neighbour = neighbourOf(id, direction)
-  if (!neighbour || !canMove(neighbour)) {
+  if (!neighbour || (neighbour.panel !== undefined && !canMove(neighbour.panel))) {
     announcement.value = `${title} cannot move ${direction}.`
     return
   }
 
   const edge = EDGE_FOR[direction]
-  const alone = home?.panels.length === 1 && groupOf(current, neighbour)?.panels.length === 1
+
+  if (neighbour.space) {
+    const space = neighbour.space
+    const landed = nodeAt(current, space)
+    // A window keeps the size it was, the way a drop on bare desktop keeps it:
+    // what a desktop takes is a window, wherever the panel came from.
+    const was = findFrame(current, id)?.rect
+    const rect = { ...DEFAULT_FRAME, ...(was ? { w: was.w, h: was.h } : {}) }
+    apply(dropIntoSpace(current, id, space, rect), { panel: id, target: '', space, edge })
+    announcement.value =
+      `${title} moved ${direction}, into ${landed ? spaceTitle(landed) : 'the space'}.`
+    restoreGrip(id)
+    return
+  }
+
+  const target = neighbour.panel
+  const alone = home?.panels.length === 1 && groupOf(current, target)?.panels.length === 1
 
   if (join) {
-    apply(movePanel(current, id, neighbour, 'center'), {
+    apply(movePanel(current, id, target, 'center'), {
       panel: id,
-      target: neighbour,
+      target,
       edge: 'center',
     })
-    announcement.value = `${title} joined ${titleOf(neighbour)} as a tab.`
+    announcement.value = `${title} joined ${titleOf(target)} as a tab.`
   } else if (alone) {
     /*
      * Two panes of one panel each: trading places puts the panel exactly where
@@ -948,11 +1058,11 @@ function nudge(id: string, direction: MoveDirection, join = false) {
      * it back would halve the neighbour instead, so a panel walked across the
      * grid would leave a trail of resized panes behind it.
      */
-    apply(swapPanels(current, id, neighbour), { panel: id, target: neighbour, edge })
-    announcement.value = `${title} moved ${direction}, trading places with ${titleOf(neighbour)}.`
+    apply(swapPanels(current, id, target), { panel: id, target, edge })
+    announcement.value = `${title} moved ${direction}, trading places with ${titleOf(target)}.`
   } else {
-    apply(movePanel(current, id, neighbour, edge), { panel: id, target: neighbour, edge })
-    announcement.value = `${title} moved ${direction}, beside ${titleOf(neighbour)}.`
+    apply(movePanel(current, id, target, edge), { panel: id, target, edge })
+    announcement.value = `${title} moved ${direction}, beside ${titleOf(target)}.`
   }
   restoreGrip(id)
 }
@@ -1072,10 +1182,13 @@ const tabsTitle = (home: WindowGroup): string => home.title || 'These tabs'
  * The four ways a space can be shown are appfr's four display modes, expressed
  * as operations on the tree rather than as a field on a node: a row, a column,
  * one set of tabs, or a desktop they float over. Which of them is *already*
- * true is read back off the layout, and an option that would change nothing is
- * offered disabled rather than hidden — which the pure operations make exact,
- * since each returns the tree it was given, identical, when it has nothing to
- * do.
+ * true is read back off the layout and said with a tick — never by taking the
+ * option away. A display mode greyed out reads as one this space is not
+ * allowed to be shown in, which is the opposite of what a ticked one says, and
+ * the four are one question with one answer: the tick is that answer, at every
+ * one of them. Choosing what is already true does nothing, which the pure
+ * operations make exact — each hands back the tree it was given, identical,
+ * when it has nothing to do, and an identical tree is never written back.
  */
 function windowMenu(
   current: WindowNode,
@@ -1087,9 +1200,8 @@ function windowMenu(
   /** A space whose display the host fixed offers no way to change it. */
   const fixedView = home?.fixedView === true
 
-  /** An option that would leave the layout exactly as it is cannot be taken. */
+  /** An option that would leave the layout exactly as it is leaves it alone. */
   const change = (next: WindowNode) => ({
-    disabled: next === current,
     action: () => {
       if (next !== current) layout.value = next
     },
@@ -1162,8 +1274,15 @@ function windowMenu(
         checked: false,
         ...change(spreadTabs(current, id, 'column')),
       },
-      // Already true, and nothing to collapse: these panes are tabs.
-      { id: 'show-tabs', label: 'Tabs', checked: true, disabled: true },
+      // Already true, and nothing to collapse: these panes are tabs. Ticked
+      // and choosable all the same — collapsing a strip into a strip hands
+      // back the tree it was given, so it is the no-op it looks like.
+      {
+        id: 'show-tabs',
+        label: 'Tabs',
+        checked: true,
+        ...change(collapseToTabs(current, id)),
+      },
       {
         id: 'show-desktop',
         label: 'Desktop',
@@ -1216,6 +1335,43 @@ function tabSteps(home: WindowGroup, fallback: string): MenuItemDef[] {
 }
 
 /**
+ * What another space is called where this one's menu names it: whatever its own
+ * bar says, since that bar is what the item is about.
+ *
+ * A strip has no name of its own to say — its tabs say what is on it — so it is
+ * *these tabs*, the same words the items about them are headed with.
+ */
+function otherName(node: WindowNode): string {
+  if (node.title) return node.title
+  if (isGroup(node)) return node.panels.length > 1 ? 'these tabs' : 'the strip'
+  return spaceTitle(node)
+}
+
+/**
+ * The space a space holds and nothing else, when the two of them are a pair a
+ * user may be offered one of.
+ *
+ * Only where the outer is a space the host said something about — a name of its
+ * own, or a bar it does or does not draw. Without that it would already *be*
+ * its child, `normalizeLayout` collapsing a split of one into it, so the
+ * chrome-less pairs that reach here are the two that are not really pairs: the
+ * row `rootSpace` keeps around a lone pane, which stands in for the space that
+ * pane has not got rather than drawing a second bar, and a split that remembers
+ * the desktop it was tiled from, whose `places` pair one to one with that child
+ * and are the only way back to it.
+ *
+ * Neither half may be `fixedView`. A space whose display the host fixed is not
+ * one a user dissolves — and the merge would drop that very field.
+ */
+function mergePair(outer: WindowNode | null): WindowNode | null {
+  if (!outer || isFloat(outer) || outer.fixedView === true) return null
+  if (!outer.title && outer.headless !== true) return null
+  if (placesOf(outer)) return null
+  const inner = onlySpace(outer)
+  return inner && inner.fixedView !== true ? inner : null
+}
+
+/**
  * The menu a *space* offers, rather than a pane: the four display modes again,
  * on the title bar of the desktop they are about.
  *
@@ -1226,12 +1382,15 @@ function tabSteps(home: WindowGroup, fallback: string): MenuItemDef[] {
  * grid has no pane whose container it is, so there would be nothing to name it
  * by. The path it was rendered at says it exactly, and once.
  *
- * "Desktop" is what it already is, so it is ticked and cannot be taken; the
- * other three each rewrite the float into the space it would become.
+ * "Desktop" is what it already is, so it is ticked; the other three each
+ * rewrite the float into the space it would become.
  *
  * The two that step along a strip are about the space *around* this one, so
  * where there is a strip both groups are named — the same two levels a pane's
  * menu names, a level up.
+ *
+ * A space holding one space is the other thing this menu has to say, and it is
+ * said from both of the two bars that space is drawn with: which of them stays.
  */
 function spaceMenu(path: readonly number[]): MenuItemDef[] {
   const current = resolved.value
@@ -1246,36 +1405,60 @@ function spaceMenu(path: readonly number[]): MenuItemDef[] {
   const shown = isFloat(node) ? 'desktop' : node.direction
 
   /*
-   * A tiled space of one pane is already all three of the tiled shapes: a row
-   * of one, a column of one and one set of tabs are the same thing on screen,
-   * so only "Desktop" has anywhere to take it. A *float* of one is not — every
-   * one of the three takes it off the desktop, which is a real change.
+   * All four are offered, whichever is true. Each rewrites this node into the
+   * space it would become, in place: the path is what says where, so nothing
+   * has to be found from a panel inside it. An option with nothing to do hands
+   * this very node back, and that is what is not written — the check is on the
+   * tree, and the item stays exactly as choosable as its three neighbours.
+   *
+   * A tiled space of one pane is the case that says why. A row of one, a
+   * column of one and one set of tabs are the same thing on screen, so three
+   * of the four would grey out at once — a menu that looks broken, offering a
+   * single choice, while every one of the four was perfectly true of it.
    */
-  const inert = isSplit(node) && node.children.length === 1
+  const mode = (key: string, label: string, becomes: () => WindowNode): MenuItemDef => ({
+    id: `show-${key}`,
+    label,
+    checked: shown === key,
+    action: () => {
+      const tree = resolved.value
+      const next = becomes()
+      if (!tree || next === node) return
+      // Settled the way the window settles anything it renders, so the layout
+      // a host stores is the one on screen.
+      layout.value = rootSpace(normalizeLayout(replaceAt(tree, path, next)))
+    },
+  })
 
-  /*
-   * An option that names what is already true, or that has nothing to do,
-   * cannot be taken. The rest each rewrite this node into the space it would
-   * become, in place: the path is what says where, so nothing has to be found
-   * from a panel inside it.
+  /**
+   * Everything in this space in one strip.
+   *
+   * Unless that strip would be one panel, which is not a space: it would have
+   * no bar of its own left to be shown another way from, and the pane in it
+   * holds content rather than panels, so it has none either — the same reason
+   * `rootSpace` keeps a row around the last pane in a window. A space of one
+   * pane already looks exactly like the strip it would become, so handing this
+   * node back loses nothing but the trap.
+   *
+   * Nor where the space holds nothing at all. A strip is said by its tabs, so a
+   * strip of none is not a space either — it is dropped the moment it is made,
+   * and this space, which is being kept precisely because it was named, would
+   * go with it. The other three shapes have a bar of their own to keep it on.
    */
-  const mode = (key: string, label: string, becomes: () => WindowNode): MenuItemDef =>
-    shown === key || (inert && key !== 'desktop')
-      ? { id: `show-${key}`, label, checked: shown === key, disabled: true }
-      : {
-          id: `show-${key}`,
-          label,
-          checked: false,
-          action: () => {
-            const tree = resolved.value
-            // Settled the way the window settles anything it renders, so the
-            // layout a host stores is the one on screen.
-            if (tree) layout.value = rootSpace(normalizeLayout(replaceAt(tree, path, becomes())))
-          },
-        }
+  const asTabs = () => {
+    const tabs = collapseSpace(node, activeIn(node))
+    if (isGroup(tabs) && tabs.panels.length === 0) return node
+    const only = isGroup(tabs) && tabs.panels.length === 1 ? tabs.panels[0] : undefined
+    return only !== undefined && isPanelTab(only) ? node : tabs
+  }
 
+  /** A row asked to be a row is that row, so choosing it writes nothing. */
   const asSplit = (direction: SplitDirection) => () =>
-    isFloat(node) ? tileFloat(node, direction) : { ...node, direction }
+    isFloat(node)
+      ? tileFloat(node, direction)
+      : node.direction === direction
+        ? node
+        : { ...node, direction }
 
   /*
    * A space sharing a strip has that strip for a bar, so the two items that step
@@ -1283,8 +1466,53 @@ function spaceMenu(path: readonly number[]): MenuItemDef[] {
    * to the tab beside it, and every other bar this menu is drawn on is a bar the
    * space has to itself.
    */
-  const strip = path.length > 0 ? nodeAt(current, path.slice(0, -1)) : null
-  const inStrip = strip && isGroup(strip) && strip.panels.length > 1 ? strip : null
+  const outward = path.slice(0, -1)
+  const outer = path.length > 0 ? nodeAt(current, outward) : null
+  const inStrip = outer && isGroup(outer) && outer.panels.length > 1 ? outer : null
+
+  /*
+   * Two bars over one content, and the two ways of being left with one of them.
+   *
+   * A space holding one space is a bar drawn twice: this one, and the one the
+   * space inside draws — or the one around it draws, when this is the space
+   * inside. Which of the two goes is the whole question, the panes under them
+   * being the same panes either way, so the items say which name is kept rather
+   * than what is done to the tree.
+   *
+   * Both pairs are offered where both are there, under a heading saying which:
+   * a space can be the inside of one pair and the outside of another, and
+   * *Keep this space* means a different thing in each.
+   *
+   * What is never offered is the half whose going would take a name with it.
+   * A name is the host's, and the strongest thing a space says about itself —
+   * `hasChrome` keeps a named space whole through every operation that would
+   * otherwise dissolve it, and a menu item that undid all that with one click
+   * would be the exception that made the rule worthless. So a pair of two
+   * named spaces offers nothing here and stays a pair, and a pair with one
+   * name between them offers the one merge that keeps it.
+   */
+  const around = outer && mergePair(outer) === node ? outer : null
+  const inside = mergePair(node)
+  /** This space, where an item names it beside the other one. */
+  const own = node.title || 'this space'
+
+  /** One space where there were two, replacing the outer of the pair. */
+  const merge = (
+    id: string,
+    at: readonly number[],
+    pair: WindowNode,
+    keep: 'outer' | 'inner',
+    label: string,
+  ): MenuItemDef => ({
+    id,
+    label,
+    action: () => {
+      const tree = resolved.value
+      if (tree) {
+        layout.value = rootSpace(normalizeLayout(replaceAt(tree, at, mergeSpace(pair, keep))))
+      }
+    },
+  })
 
   return sectioned([
     {
@@ -1300,9 +1528,37 @@ function spaceMenu(path: readonly number[]): MenuItemDef[] {
         mode('column', 'Column', asSplit('column')),
         // Everything in this space in one strip: the panes as tabs, and a
         // desktop among them as a tab of its own, keeping the windows on it.
-        mode('tabs', 'Tabs', () => collapseSpace(node, activeIn(node))),
+        mode('tabs', 'Tabs', () => asTabs()),
         mode('desktop', 'Desktop', () => (isFloat(node) ? node : floatSplit(node))),
       ],
+    },
+    {
+      id: 'about-around',
+      title: inside ? `Around ${otherName(inside)}` : '',
+      items: inside
+        ? [
+            // Keeping this space's bar drops the one inside, so it is offered
+            // only where the space inside has no name to be dropped with it.
+            ...(inside.title ? [] : [merge('merge-around-keep-this', path, node, 'outer', `Keep ${own}`)]),
+            ...(node.title
+              ? []
+              : [merge('merge-around-keep-that', path, node, 'inner', `Keep ${otherName(inside)}`)]),
+          ]
+        : [],
+    },
+    {
+      id: 'about-inside',
+      title: around ? `Inside ${otherName(around)}` : '',
+      items: around
+        ? [
+            ...(node.title
+              ? []
+              : [merge('merge-inside-keep-that', outward, around, 'outer', `Keep ${otherName(around)}`)]),
+            ...(around.title
+              ? []
+              : [merge('merge-inside-keep-this', outward, around, 'inner', `Keep ${own}`)]),
+          ]
+        : [],
     },
     {
       id: 'about-tabs',
