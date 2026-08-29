@@ -19,6 +19,7 @@ import { iRadarSchema } from '../src/fixtures/schemas'
 import type {
   DataSource,
   DomainSchema,
+  EntitySchema,
   FacetDef,
   FacetValue,
   RecordStatus,
@@ -81,6 +82,12 @@ export interface ShellStoryArgs {
   host?: 'paper' | 'slate'
   /** Slot content, for the stories about what a host puts into the shell. */
   slots?: Record<string, () => unknown>
+  /**
+   * What the host does when a card's `create` button is pressed. The shell
+   * makes nothing itself, so a story that offers the button needs one of
+   * these for anything to come of it.
+   */
+  onCreate?: (entity: EntitySchema) => void
 }
 
 /**
@@ -110,6 +117,7 @@ export function renderShell(args: ShellStoryArgs) {
           ...(args.accent ? { accent: args.accent } : {}),
           ...(args.tokens ? { tokens: args.tokens } : {}),
           ...(args.open ? { open: true } : {}),
+          ...(args.onCreate ? { onCreate: args.onCreate } : {}),
         }, args.slots)
 
       const hosted = () =>
@@ -245,6 +253,7 @@ export const ItemsPanel = defineComponent({
       isPinnedId: () => false,
       togglePin: () => {},
       activate: () => {},
+      create: () => {},
     })
 
     watch(

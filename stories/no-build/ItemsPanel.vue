@@ -61,6 +61,7 @@ provideShellContext({
   isPinnedId: () => false,
   togglePin: () => {},
   activate: () => {},
+  create: () => {},
 })
 
 watch(
