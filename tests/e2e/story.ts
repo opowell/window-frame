@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import type { DropEdge } from '../../src/window/types'
 
@@ -21,6 +22,30 @@ export const trigger = (page: Page) => page.locator('.dc-header__trigger')
 export const summary = (page: Page) => page.locator('.dc-header__summary')
 export const panel = (page: Page) => page.locator('.dc-panel')
 export const listRows = (page: Page) => page.locator('.dc-list__row')
+
+/**
+ * The header's paging control, which is only in the bar when there is more
+ * than one page — so its absence is an assertion worth making too.
+ */
+export const pager = (page: Page) => page.locator('.dc-header__pages')
+
+/** Its readout: which page of how many. */
+export const pageReadout = (page: Page) => page.locator('.dc-header__page')
+
+export const pageStep = (page: Page, which: 'Previous' | 'Next') =>
+  pager(page).getByRole('button', { name: `${which} page` })
+
+/** Steps a page and waits for the readout to say it has moved. */
+export async function stepPage(page: Page, which: 'Previous' | 'Next'): Promise<void> {
+  const before = await pageReadout(page).innerText()
+  await pageStep(page, which).click()
+  await expect(pageReadout(page)).not.toHaveText(before)
+}
+
+/** The leading ordinal of each row on screen, which counts the whole result. */
+export function rowOrdinals(page: Page): Promise<string[]> {
+  return listRows(page).locator('.dc-list__ordinal').allTextContents()
+}
 
 /** Opens the query panel by clicking the header, as a user would. */
 export async function openPanel(page: Page): Promise<void> {

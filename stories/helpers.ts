@@ -22,8 +22,10 @@ import type {
   FacetDef,
   FacetValue,
   RecordStatus,
+  ShellAlign,
   ShellQueryDefaults,
   ShellTheme,
+  ShellWidthMatch,
   ViewKind,
 } from '../src/types'
 import type { WindowNode, WindowPanelDef } from '../src/window/types'
@@ -55,6 +57,10 @@ export interface ShellStoryArgs {
   pinnable?: boolean
   open?: boolean
   theme?: ShellTheme
+  /** Whether the panel grows to the bar, or the bar comes in to the panel. */
+  matchWidth?: ShellWidthMatch
+  /** Where the pair sits once `matchWidth: 'shrink'` has narrowed them. */
+  headAlign?: ShellAlign
   accent?: string
   /** Token overrides passed straight to the shell. */
   tokens?: Record<string, string>
@@ -98,6 +104,8 @@ export function renderShell(args: ShellStoryArgs) {
           previewsPerType: args.previewsPerType ?? 3,
           pinnable: args.pinnable ?? false,
           theme: args.theme ?? 'minimal',
+          matchWidth: args.matchWidth ?? 'grow',
+          headAlign: args.headAlign ?? 'center',
           ...(args.defaults ? { defaults: args.defaults } : {}),
           ...(args.accent ? { accent: args.accent } : {}),
           ...(args.tokens ? { tokens: args.tokens } : {}),
@@ -225,6 +233,9 @@ export const ItemsPanel = defineComponent({
       entities: computed(() => props.schema.entities),
       rows: results.rows,
       total: results.total,
+      limit: computed(() => 50),
+      offset: results.offset,
+      pageCount: results.pageCount,
       pending: results.pending,
       error: results.error,
       source,
