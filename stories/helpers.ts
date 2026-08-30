@@ -69,6 +69,8 @@ export interface ShellStoryArgs {
   limit?: number
   /** Rows inside each type's card on the home screen. */
   previewsPerType?: number
+  /** Restricts the offered result views. Every one of them when unset. */
+  views?: ViewKind[]
   /**
    * Drive the real address bar instead of an in-memory route. Off by default so
    * stories stay isolated from each other; the routing stories turn it on.
@@ -114,6 +116,7 @@ export function renderShell(args: ShellStoryArgs) {
           theme: args.theme ?? 'minimal',
           matchWidth: args.matchWidth ?? 'grow',
           headAlign: args.headAlign ?? 'center',
+          ...(args.views ? { views: args.views } : {}),
           ...(args.defaults ? { defaults: args.defaults } : {}),
           ...(args.accent ? { accent: args.accent } : {}),
           ...(args.tokens ? { tokens: args.tokens } : {}),
@@ -174,6 +177,32 @@ export function delayedSource(ms: number, seed = 'iRadar'): DataSource {
   return {
     query: (request) =>
       new Promise((resolve) => setTimeout(() => resolve(inner.query(request)), ms)),
+  }
+}
+
+/**
+ * The mock source with names and paths long enough to overrun any column.
+ *
+ * What a real corpus looks like once its records are files: a name that is a
+ * sentence and a secondary that is the path it came from, both far past what a
+ * column can hold. The views have to stay inside the shell's width regardless,
+ * so this is what the ones with columns are tested against.
+ */
+export function longValueSource(seed = 'iRadar'): DataSource {
+  const inner = createMockDataSource({ seed })
+  const PREFIX = 'packages/test-tooling/record-test/.crawl-runs/2026-08-29T20-08-58'
+  return {
+    query: (request) => {
+      const result = inner.query(request)
+      return {
+        ...result,
+        rows: result.rows.map((row) => ({
+          ...row,
+          primary: `${row.primary} — every word of a name nobody thought would be shown in a column`,
+          secondary: `${PREFIX}/${row.id}/${row.secondary}`,
+        })),
+      }
+    },
   }
 }
 
