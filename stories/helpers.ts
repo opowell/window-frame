@@ -262,8 +262,7 @@ export const ItemsPanel = defineComponent({
        * of what a host has to write.
        */
       drill: (row, entity) => {
-        query.setExpression(drillExpression(props.schema, query.query.value, row))
-        query.setEntity(entity?.key ?? null)
+        query.narrow(drillExpression(props.schema, query.query.value, row), entity?.key ?? null)
       },
     })
 
