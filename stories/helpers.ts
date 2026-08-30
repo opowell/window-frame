@@ -10,6 +10,7 @@ import { provideShellContext } from '../src/composables/context'
 import { usePaneMenu } from '../src/composables/paneMenu'
 import { useQueryState } from '../src/composables/useQueryState'
 import { useResults } from '../src/composables/useResults'
+import { drillExpression } from '../src/query/drill'
 import { isViewKind } from '../src/query/schema'
 import { SHELL_THEMES, VIEW_KINDS } from '../src/types'
 import { createMemoryAdapter } from '../src/routing/memory'
@@ -254,6 +255,16 @@ export const ItemsPanel = defineComponent({
       togglePin: () => {},
       activate: () => {},
       create: () => {},
+      /*
+       * The reference host: a drill is an expression term plus, when the press
+       * was a metric rather than the row, the entity to list afterwards. The
+       * shell reports it and this decides what it meant — which is the whole
+       * of what a host has to write.
+       */
+      drill: (row, entity) => {
+        query.setExpression(drillExpression(props.schema, query.query.value, row))
+        query.setEntity(entity?.key ?? null)
+      },
     })
 
     watch(
