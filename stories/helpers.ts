@@ -202,10 +202,15 @@ export function longValueSource(seed = 'iRadar'): DataSource {
       const result = inner.query(request)
       return {
         ...result,
+        // iRadar's rows read their identity and reference from `primary` and
+        // `secondary`, which is what `defaultColumns` names those fields.
         rows: result.rows.map((row) => ({
           ...row,
-          primary: `${row.primary} — every word of a name nobody thought would be shown in a column`,
-          secondary: `${PREFIX}/${row.id}/${row.secondary}`,
+          fields: {
+            ...row.fields,
+            primary: `${String(row.fields.primary)} — every word of a name nobody thought would be shown in a column`,
+            secondary: `${PREFIX}/${row.id}/${String(row.fields.secondary)}`,
+          },
         })),
       }
     },
@@ -283,20 +288,31 @@ export function selectableSchema(): DomainSchema {
   const columns: ColumnDef[] = [
     { key: 'select', kind: 'component', component: SelectCell, width: '36px' },
     { key: 'ordinal', kind: 'ordinal', label: '#', width: '48px' },
-    { key: 'primary', label: 'Item', sort: 'name', activate: true, scope: true },
-    { key: 'secondary', label: 'URL', mono: true, muted: true, hideBelow: 620 },
+    { key: 'primary', role: 'identity', label: 'Item', sort: 'name', activate: true, scope: true },
+    { key: 'secondary', role: 'reference', label: 'URL', mono: true, muted: true, hideBelow: 620 },
     { key: 'kind', label: 'Kind', width: '80px' },
     { key: 'rank', label: 'Rank', width: '72px', align: 'right', mono: true, hideBelow: 760 },
     {
       key: 'metric1',
+      role: 'metric',
       kind: 'number',
       label: 'Links',
       width: '80px',
       sort: 'metric1',
       hideBelow: 900,
     },
-    { key: 'updatedAt', kind: 'date', label: 'Updated', sort: 'updated', width: '116px', mono: true, muted: true, hideBelow: 900 },
-    { key: 'status', kind: 'status', label: 'State', width: '104px' },
+    {
+      key: 'updatedAt',
+      role: 'updated',
+      kind: 'date',
+      label: 'Updated',
+      sort: 'updated',
+      width: '116px',
+      mono: true,
+      muted: true,
+      hideBelow: 900,
+    },
+    { key: 'status', role: 'state', kind: 'status', label: 'State', width: '104px' },
   ]
   return {
     ...iRadarSchema,
@@ -337,11 +353,12 @@ export function everythingColumnsSchema(): DomainSchema {
     columns: [
       { key: 'ordinal', kind: 'ordinal', label: '#', width: '48px' },
       { key: 'entityLabel', label: 'Kind', width: '120px', mono: true, when: 'everything' },
-      { key: 'primary', label: 'Record', sort: 'name', activate: true, scope: true },
-      { key: 'secondary', label: 'Reference', mono: true, muted: true, hideBelow: 620 },
-      { key: 'score', kind: 'score', label: 'Match', width: '72px', hideBelow: 760 },
+      { key: 'primary', role: 'identity', label: 'Record', sort: 'name', activate: true, scope: true },
+      { key: 'secondary', role: 'reference', label: 'Reference', mono: true, muted: true, hideBelow: 620 },
+      { key: 'score', role: 'score', kind: 'score', label: 'Match', width: '72px', hideBelow: 760 },
       {
         key: 'updatedAt',
+        role: 'updated',
         kind: 'date',
         label: 'Updated',
         sort: 'updated',
@@ -350,7 +367,7 @@ export function everythingColumnsSchema(): DomainSchema {
         muted: true,
         hideBelow: 900,
       },
-      { key: 'status', kind: 'status', label: 'State', width: '104px' },
+      { key: 'status', role: 'state', kind: 'status', label: 'State', width: '104px' },
     ],
   }
 }
