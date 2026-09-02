@@ -18,6 +18,7 @@ import { createHistoryAdapter } from '../src/routing/history'
 import { createMockDataSource } from '../src/data/mock'
 import { iRadarSchema } from '../src/fixtures/schemas'
 import type {
+  ColumnDef,
   DataSource,
   DomainSchema,
   EntitySchema,
@@ -33,6 +34,10 @@ import type {
 import type { WindowNode, WindowPanelDef } from '../src/window/types'
 import type { MenuItemDef } from '../src/menu/types'
 import { cascade, column, group, panelNode, row } from '../src/window/layout'
+import SelectCell from './cells/SelectCell.vue'
+import { selectedRows } from './selection'
+
+export { selectedRows }
 
 /**
  * `theme` is one of a fixed set, so the control is a picker rather than the
@@ -212,6 +217,89 @@ export function failingSource(message = 'The results service is unavailable'): D
     query: () => {
       throw new Error(message)
     },
+  }
+}
+
+/* ----------------------------------------------------------------- columns */
+
+/**
+ * iRadar's items with a column set of the host's own: a checkbox in front, the
+ * kind and the rank the facets already carry, and the date and state behind —
+ * nine columns where the labels describe four.
+ */
+export function selectableSchema(): DomainSchema {
+  const columns: ColumnDef[] = [
+    { key: 'select', kind: 'component', component: SelectCell, width: '36px' },
+    { key: 'ordinal', kind: 'ordinal', label: '#', width: '48px' },
+    { key: 'primary', label: 'Item', sort: 'name', activate: true, scope: true },
+    { key: 'secondary', label: 'URL', mono: true, muted: true, hideBelow: 620 },
+    { key: 'kind', label: 'Kind', width: '80px' },
+    { key: 'rank', label: 'Rank', width: '72px', align: 'right', mono: true, hideBelow: 760 },
+    {
+      key: 'metric1',
+      kind: 'number',
+      label: 'Links',
+      width: '80px',
+      sort: 'metric1',
+      hideBelow: 900,
+    },
+    { key: 'updatedAt', kind: 'date', label: 'Updated', sort: 'updated', width: '116px', mono: true, muted: true, hideBelow: 900 },
+    { key: 'status', kind: 'status', label: 'State', width: '104px' },
+  ]
+  return {
+    ...iRadarSchema,
+    entities: iRadarSchema.entities.map((entity) =>
+      entity.key === 'items' ? { ...entity, columns } : entity,
+    ),
+  }
+}
+
+/**
+ * A type that has not said what its table is.
+ *
+ * The shell invents no columns, so this one has no table — it says so rather
+ * than drawing an empty frame, which is what a silent `v-for` over nothing
+ * gets you and reads as the data having gone missing.
+ */
+export function noColumnsSchema(): DomainSchema {
+  return {
+    ...iRadarSchema,
+    entities: iRadarSchema.entities.map((entity) => {
+      if (entity.key !== 'searches') return entity
+      const bare = { ...entity }
+      delete bare.columns
+      return bare
+    }),
+  }
+}
+
+/**
+ * Columns for the mixed result set: every entity at once, where no single
+ * type's vocabulary applies and one set of headings has to serve rows of every
+ * kind. Declared on the schema rather than on any entity — the type leads,
+ * because across kinds it is the column that tells you most.
+ */
+export function everythingColumnsSchema(): DomainSchema {
+  return {
+    ...iRadarSchema,
+    columns: [
+      { key: 'ordinal', kind: 'ordinal', label: '#', width: '48px' },
+      { key: 'entityLabel', label: 'Kind', width: '120px', mono: true, when: 'everything' },
+      { key: 'primary', label: 'Record', sort: 'name', activate: true, scope: true },
+      { key: 'secondary', label: 'Reference', mono: true, muted: true, hideBelow: 620 },
+      { key: 'score', kind: 'score', label: 'Match', width: '72px', hideBelow: 760 },
+      {
+        key: 'updatedAt',
+        kind: 'date',
+        label: 'Updated',
+        sort: 'updated',
+        width: '116px',
+        mono: true,
+        muted: true,
+        hideBelow: 900,
+      },
+      { key: 'status', kind: 'status', label: 'State', width: '104px' },
+    ],
   }
 }
 
