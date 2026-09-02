@@ -28,6 +28,7 @@ import type {
   ShellAlign,
   ShellQueryDefaults,
   ShellTheme,
+  StreamingDataSource,
   ShellWidthMatch,
   ViewKind,
 } from '../src/types'
@@ -207,6 +208,57 @@ export function longValueSource(seed = 'iRadar'): DataSource {
           secondary: `${PREFIX}/${row.id}/${row.secondary}`,
         })),
       }
+    },
+  }
+}
+
+/**
+ * A source that finds its rows over time rather than all at once — a crawl, a
+ * scan, a scroll of pages fetched one after another.
+ *
+ * The shell prefers `stream` where a source declares it, and renders every
+ * push, so the rows appear as they are found. `query` is still here because
+ * the home screen's per-type cards each run one of their own.
+ */
+export function streamingSource(
+  options: { chunk?: number; every?: number; newestFirst?: boolean; seed?: string } = {},
+): StreamingDataSource {
+  const { chunk = 4, every = 140, newestFirst = false, seed = 'iRadar' } = options
+  const inner = createMockDataSource({ seed })
+  return {
+    query: (request) => inner.query(request),
+    stream(request, sink) {
+      const found = inner.query(request)
+      let next = 0
+      const timer = setInterval(() => {
+        // `open` goes false the moment the query moves on, and a source doing
+        // real work should stop rather than keep pushing into nothing.
+        if (!sink.open || next >= found.rows.length) {
+          clearInterval(timer)
+          // The count the source really knows, now that it has finished
+          // counting — the running total was only what it had found so far.
+          sink.set({ total: found.total })
+          sink.close()
+          return
+        }
+        sink.insert(found.rows.slice(next, next + chunk), newestFirst ? 0 : undefined)
+        next += chunk
+      }, every)
+      return () => clearInterval(timer)
+    },
+  }
+}
+
+/** A stream that fails part of the way through, rather than at the outset. */
+export function failingStreamSource(after = 8): StreamingDataSource {
+  const inner = createMockDataSource({ seed: 'iRadar' })
+  return {
+    query: (request) => inner.query(request),
+    stream(request, sink) {
+      const found = inner.query(request)
+      sink.insert(found.rows.slice(0, after))
+      const timer = setTimeout(() => sink.fail(new Error('The crawl stopped responding')), 400)
+      return () => clearTimeout(timer)
     },
   }
 }
