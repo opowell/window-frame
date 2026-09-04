@@ -19,7 +19,17 @@ export async function gotoStory(page: Page, id: string, extraSearch = ''): Promi
 
 export const header = (page: Page) => page.locator('.dc-header')
 export const trigger = (page: Page) => page.locator('.dc-header__trigger')
+/**
+ * The header's one-line summary, which is what the bar says while there is
+ * nothing in the query to lift — a pristine home screen.
+ */
 export const summary = (page: Page) => page.locator('.dc-header__summary')
+
+/** The row of query parts that replaces that summary once there is one. */
+export const termBar = (page: Page) => page.locator('.dc-header__terms')
+
+/** Each part, as its own button. Pressing one takes that part out of the query. */
+export const terms = (page: Page) => page.locator('.dc-term')
 export const panel = (page: Page) => page.locator('.dc-panel')
 export const listRows = (page: Page) => page.locator('.dc-list__row')
 
