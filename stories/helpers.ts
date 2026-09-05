@@ -203,7 +203,7 @@ export function longValueSource(seed = 'iRadar'): DataSource {
       return {
         ...result,
         // iRadar's rows read their identity and reference from `primary` and
-        // `secondary`, which is what `defaultColumns` names those fields.
+        // `secondary`, which is what the fixture schemas name those fields.
         rows: result.rows.map((row) => ({
           ...row,
           fields: {
@@ -355,7 +355,6 @@ export function everythingColumnsSchema(): DomainSchema {
       { key: 'entityLabel', label: 'Kind', width: '120px', mono: true, when: 'everything' },
       { key: 'primary', role: 'identity', label: 'Record', sort: 'name', activate: true, scope: true },
       { key: 'secondary', role: 'reference', label: 'Reference', mono: true, muted: true, hideBelow: 620 },
-      { key: 'score', role: 'score', kind: 'score', label: 'Match', width: '72px', hideBelow: 760 },
       {
         key: 'updatedAt',
         role: 'updated',
