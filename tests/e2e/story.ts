@@ -18,7 +18,15 @@ export async function gotoStory(page: Page, id: string, extraSearch = ''): Promi
 }
 
 export const header = (page: Page) => page.locator('.dc-header')
-export const trigger = (page: Page) => page.locator('.dc-header__trigger')
+
+/** The bar itself, which is the surface a press anywhere on opens the panel. */
+export const headerBar = (page: Page) => page.locator('.dc-header__trigger')
+
+/**
+ * What that surface does, as the button that carries it: the chevron holds
+ * `aria-expanded`, names the panel it controls, and is what a keyboard reaches.
+ */
+export const trigger = (page: Page) => page.locator('.dc-header__toggle')
 /**
  * The header's one-line summary, which is what the bar says while there is
  * nothing in the query to lift — a pristine home screen.
@@ -30,7 +38,39 @@ export const termBar = (page: Page) => page.locator('.dc-header__terms')
 
 /** Each part, as its own button. Pressing one takes that part out of the query. */
 export const terms = (page: Page) => page.locator('.dc-term')
+
+/**
+ * The one part of the query that is not a pill: which type is being listed,
+ * offered as a choice among the schema's own — `Everything` among them.
+ */
+export const viewSelect = (page: Page) => page.locator('.dc-header__view-select')
+
+/**
+ * What the view control says it is listing: the type's name and, after it, how
+ * many records that is.
+ */
+export async function viewLabel(page: Page): Promise<string> {
+  const chosen = await viewSelect(page).locator('option:checked').textContent()
+  return (chosen ?? '').trim()
+}
+
+/**
+ * Lists another type from the header, by the name the schema gave it. The
+ * option says a count after that name, so the match is on the name alone.
+ */
+export async function chooseView(page: Page, label: string): Promise<void> {
+  const option = viewSelect(page).locator('option').filter({ hasText: label }).first()
+  await viewSelect(page).selectOption((await option.getAttribute('value')) ?? '')
+}
 export const panel = (page: Page) => page.locator('.dc-panel')
+
+/**
+ * The panel's own query field: the box an expression is typed into, and the
+ * parts standing in front of it — one per `field:value` term the query
+ * already names, each of them a button that takes itself out.
+ */
+export const expressionBox = (page: Page) => page.locator('.dc-expression')
+export const parts = (page: Page) => page.locator('.dc-part')
 export const listRows = (page: Page) => page.locator('.dc-list__row')
 
 /**
