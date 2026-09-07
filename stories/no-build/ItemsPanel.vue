@@ -60,8 +60,18 @@ provideShellContext({
   isPinned: () => false,
   isPinnedId: () => false,
   togglePin: () => {},
+  /* This panel lists records and does nothing to them: no ticks, and none of
+     the operations a tick would be for. */
+  selectable: computed(() => false),
+  selection: computed(() => ({ ids: [], rows: [], entity: query.entity.value })),
+  isSelected: () => false,
+  toggleSelect: () => {},
+  selectPage: () => {},
+  clearSelection: () => {},
   activate: () => {},
   create: () => {},
+  duplicate: () => {},
+  delete: () => {},
 })
 
 watch(
