@@ -26,6 +26,7 @@ import type {
   FacetValue,
   RecordStatus,
   ShellAlign,
+  Selection,
   ShellQueryDefaults,
   ShellTheme,
   StreamingDataSource,
@@ -63,6 +64,8 @@ export interface ShellStoryArgs {
   source?: DataSource
   defaults?: ShellQueryDefaults
   pinnable?: boolean
+  /** Offers the tick on rows even where the type names nothing to do with one. */
+  selectable?: boolean
   open?: boolean
   theme?: ShellTheme
   /** Whether the panel grows to the bar, or the bar comes in to the panel. */
@@ -97,6 +100,13 @@ export interface ShellStoryArgs {
    * these for anything to come of it.
    */
   onCreate?: (entity: EntitySchema) => void
+  /**
+   * And what it does when the two operations on a selection are asked for.
+   * Reported exactly as `create` is — the shell copies nothing and deletes
+   * nothing — so a story that offers the buttons answers them here.
+   */
+  onDuplicate?: (selection: Selection) => void
+  onDelete?: (selection: Selection) => void
 }
 
 /**
@@ -119,6 +129,7 @@ export function renderShell(args: ShellStoryArgs) {
           limit: args.limit ?? 50,
           previewsPerType: args.previewsPerType ?? 3,
           pinnable: args.pinnable ?? false,
+          selectable: args.selectable ?? false,
           theme: args.theme ?? 'minimal',
           matchWidth: args.matchWidth ?? 'grow',
           headAlign: args.headAlign ?? 'center',
@@ -128,6 +139,8 @@ export function renderShell(args: ShellStoryArgs) {
           ...(args.tokens ? { tokens: args.tokens } : {}),
           ...(args.open ? { open: true } : {}),
           ...(args.onCreate ? { onCreate: args.onCreate } : {}),
+          ...(args.onDuplicate ? { onDuplicate: args.onDuplicate } : {}),
+          ...(args.onDelete ? { onDelete: args.onDelete } : {}),
         }, args.slots)
 
       const hosted = () =>
@@ -438,8 +451,18 @@ export const ItemsPanel = defineComponent({
       isPinned: () => false,
       isPinnedId: () => false,
       togglePin: () => {},
+      /* This panel lists records and does nothing to them, so it offers no
+         ticks and none of the operations a tick would be for. */
+      selectable: computed(() => false),
+      selection: computed(() => ({ ids: [], rows: [], entity: query.entity.value })),
+      isSelected: () => false,
+      toggleSelect: () => {},
+      selectPage: () => {},
+      clearSelection: () => {},
       activate: () => {},
       create: () => {},
+      duplicate: () => {},
+      delete: () => {},
       /*
        * The reference host: a drill is an expression term plus, when the press
        * was a metric rather than the row, the entity to list afterwards. The
