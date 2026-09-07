@@ -27,30 +27,27 @@ export const headerBar = (page: Page) => page.locator('.dc-header__trigger')
  * `aria-expanded`, names the panel it controls, and is what a keyboard reaches.
  */
 export const trigger = (page: Page) => page.locator('.dc-header__toggle')
-/**
- * The header's one-line summary, which is what the bar says while there is
- * nothing in the query to lift — a pristine home screen.
- */
-export const summary = (page: Page) => page.locator('.dc-header__summary')
-
-/** The row of query parts that replaces that summary once there is one. */
+/** The row the query sits in: its two choosers, and a pill per part of it. */
 export const termBar = (page: Page) => page.locator('.dc-header__terms')
 
 /** Each part, as its own button. Pressing one takes that part out of the query. */
 export const terms = (page: Page) => page.locator('.dc-term')
 
 /**
- * The one part of the query that is not a pill: which type is being listed,
- * offered as a choice among the schema's own — `Everything` among them.
+ * One of the two parts of the query that are not pills: which type is being
+ * listed, offered as a choice among the schema's own — `Everything` among them.
  */
+export const scopeSelect = (page: Page) => page.locator('.dc-header__scope-select')
+
+/** And the other: how the results are drawn. */
 export const viewSelect = (page: Page) => page.locator('.dc-header__view-select')
 
 /**
- * What the view control says it is listing: the type's name and, after it, how
+ * What the type control says it is listing: the type's name and, after it, how
  * many records that is.
  */
-export async function viewLabel(page: Page): Promise<string> {
-  const chosen = await viewSelect(page).locator('option:checked').textContent()
+export async function scopeLabel(page: Page): Promise<string> {
+  const chosen = await scopeSelect(page).locator('option:checked').textContent()
   return (chosen ?? '').trim()
 }
 
@@ -58,9 +55,9 @@ export async function viewLabel(page: Page): Promise<string> {
  * Lists another type from the header, by the name the schema gave it. The
  * option says a count after that name, so the match is on the name alone.
  */
-export async function chooseView(page: Page, label: string): Promise<void> {
-  const option = viewSelect(page).locator('option').filter({ hasText: label }).first()
-  await viewSelect(page).selectOption((await option.getAttribute('value')) ?? '')
+export async function chooseScope(page: Page, label: string): Promise<void> {
+  const option = scopeSelect(page).locator('option').filter({ hasText: label }).first()
+  await scopeSelect(page).selectOption((await option.getAttribute('value')) ?? '')
 }
 export const panel = (page: Page) => page.locator('.dc-panel')
 
