@@ -63,6 +63,8 @@ export interface ShellStoryArgs {
   schema?: DomainSchema
   source?: DataSource
   defaults?: ShellQueryDefaults
+  /** An expression the whole shell is read inside — its scope, not its query. */
+  within?: string
   pinnable?: boolean
   /** Offers the tick on rows even where the type names nothing to do with one. */
   selectable?: boolean
@@ -134,6 +136,7 @@ export function renderShell(args: ShellStoryArgs) {
           matchWidth: args.matchWidth ?? 'grow',
           headAlign: args.headAlign ?? 'center',
           ...(args.views ? { views: args.views } : {}),
+          ...(args.within ? { within: args.within } : {}),
           ...(args.defaults ? { defaults: args.defaults } : {}),
           ...(args.accent ? { accent: args.accent } : {}),
           ...(args.tokens ? { tokens: args.tokens } : {}),
@@ -482,6 +485,9 @@ export const ItemsPanel = defineComponent({
       error: results.error,
       source,
       previewsPerType: computed(() => 3),
+      /* A panel is not read inside anything: what it lists is the query and
+         nothing else. */
+      within: computed(() => ''),
       pinnable: computed(() => false),
       isPinned: () => false,
       isPinnedId: () => false,
