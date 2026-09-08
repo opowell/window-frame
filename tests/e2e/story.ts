@@ -27,20 +27,40 @@ export const headerBar = (page: Page) => page.locator('.dc-header__trigger')
  * `aria-expanded`, names the panel it controls, and is what a keyboard reaches.
  */
 export const trigger = (page: Page) => page.locator('.dc-header__toggle')
-/** The row the query sits in: its two choosers, and a pill per part of it. */
+/** The row the query sits in: its three choosers, and a pill per part of it. */
 export const termBar = (page: Page) => page.locator('.dc-header__terms')
 
 /** Each part, as its own button. Pressing one takes that part out of the query. */
 export const terms = (page: Page) => page.locator('.dc-term')
 
 /**
- * One of the two parts of the query that are not pills: which type is being
+ * One of the three parts of the query that are not pills: which type is being
  * listed, offered as a choice among the schema's own — `Everything` among them.
  */
 export const scopeSelect = (page: Page) => page.locator('.dc-header__scope-select')
 
-/** And the other: how the results are drawn. */
+/** The second: how the results are drawn. */
 export const viewSelect = (page: Page) => page.locator('.dc-header__view-select')
+
+/** The third: what they are ordered by. */
+export const sortSelect = (page: Page) => page.locator('.dc-header__sort-select')
+
+/** And the press beside it, which runs that order the other way. */
+export const sortDirection = (page: Page) => page.locator('.dc-header__dir')
+
+/** Draws the results another way, by the view's own key. */
+export async function chooseView(page: Page, key: string): Promise<void> {
+  await viewSelect(page).selectOption(key)
+}
+
+/**
+ * Orders them by another column, named as the schema names it — the label is
+ * what the chooser shows, and what a table heading offering the same order
+ * says too.
+ */
+export async function chooseSort(page: Page, label: string): Promise<void> {
+  await sortSelect(page).selectOption({ label })
+}
 
 /**
  * What the type control says it is listing: the type's name and, after it, how
@@ -58,6 +78,11 @@ export async function scopeLabel(page: Page): Promise<string> {
 export async function chooseScope(page: Page, label: string): Promise<void> {
   const option = scopeSelect(page).locator('option').filter({ hasText: label }).first()
   await scopeSelect(page).selectOption((await option.getAttribute('value')) ?? '')
+}
+
+/** Widens back out to the whole corpus, which is the scope chooser's first option. */
+export async function clearScope(page: Page): Promise<void> {
+  await scopeSelect(page).selectOption('')
 }
 export const panel = (page: Page) => page.locator('.dc-panel')
 
@@ -101,18 +126,12 @@ export async function openPanel(page: Page): Promise<void> {
 }
 
 /**
- * The scope card for one entity, matched on its label exactly. A loose text
- * match would also hit the "Everything" card, whose own description mentions
- * logs and settings.
+ * Filters the results to one entity, by the name the schema gave it — the same
+ * move as {@link chooseScope}, kept under the name the tests that narrow to a
+ * type read better with.
  */
-export const entityCard = (page: Page, label: string) =>
-  page.locator('.dc-entity').filter({
-    has: page.locator('.dc-entity__label', { hasText: new RegExp(`^${label}$`) }),
-  })
-
-/** Filters the results to one entity through the query panel. */
 export async function pickEntity(page: Page, label: string): Promise<void> {
-  await entityCard(page, label).click()
+  await chooseScope(page, label)
 }
 
 /**
