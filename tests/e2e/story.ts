@@ -72,13 +72,30 @@ export async function scopeLabel(page: Page): Promise<string> {
 }
 
 /**
- * Lists another type from the header, by the name the schema gave it. The
- * option says a count after that name, so the match is on the name alone.
+ * Lists another type, by the name the schema gave it — however the bar offers
+ * it.
+ *
+ * Usually that is the chooser, and the option says a count after the name, so
+ * the match is on the name alone. On the card-per-type screen there is no
+ * chooser: every card is headed by its type and pressing that heading is the
+ * same move, so the bar does not offer the choice twice. That heading is what
+ * this presses there, which is also the path a reader takes.
  */
 export async function chooseScope(page: Page, label: string): Promise<void> {
-  const option = scopeSelect(page).locator('option').filter({ hasText: label }).first()
-  await scopeSelect(page).selectOption((await option.getAttribute('value')) ?? '')
+  if (await scopeSelect(page).count()) {
+    const option = scopeSelect(page).locator('option').filter({ hasText: label }).first()
+    await scopeSelect(page).selectOption((await option.getAttribute('value')) ?? '')
+    return
+  }
+  await typeCardHead(page, label).click()
 }
+
+/** The heading of one type's card, which filters the results to that type. */
+export const typeCardHead = (page: Page, label: string): Locator =>
+  page
+    .locator('.dc-type')
+    .filter({ has: page.locator('.dc-type__name', { hasText: new RegExp(`^${label}$`) }) })
+    .locator('.dc-type__head')
 
 /** Widens back out to the whole corpus, which is the scope chooser's first option. */
 export async function clearScope(page: Page): Promise<void> {
