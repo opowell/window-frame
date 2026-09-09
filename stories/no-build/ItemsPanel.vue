@@ -56,6 +56,10 @@ provideShellContext({
   error: results.error,
   source,
   previewsPerType: computed(() => 3),
+  /* A panel is read inside nothing, and its rows narrow nothing: what it
+     lists is the query and nothing else. */
+  within: computed(() => ''),
+  narrowsOnPress: computed(() => false),
   pinnable: computed(() => false),
   isPinned: () => false,
   isPinnedId: () => false,

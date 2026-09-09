@@ -25,12 +25,13 @@ import type {
   FacetDef,
   FacetValue,
   RecordStatus,
-  ShellAlign,
   Selection,
+  ShellAlign,
   ShellQueryDefaults,
+  ShellRow,
   ShellTheme,
-  StreamingDataSource,
   ShellWidthMatch,
+  StreamingDataSource,
   ViewKind,
 } from '../src/types'
 import type { WindowNode, WindowPanelDef } from '../src/window/types'
@@ -65,6 +66,8 @@ export interface ShellStoryArgs {
   defaults?: ShellQueryDefaults
   /** An expression the whole shell is read inside — its scope, not its query. */
   within?: string
+  /** What pressing a row means: narrow to the record, or report it. */
+  rowPress?: 'open' | 'narrow'
   pinnable?: boolean
   /** Offers the tick on rows even where the type names nothing to do with one. */
   selectable?: boolean
@@ -96,6 +99,8 @@ export interface ShellStoryArgs {
   host?: 'paper' | 'slate'
   /** Slot content, for the stories about what a host puts into the shell. */
   slots?: Record<string, () => unknown>
+  /** What the host does with a press it is handed — see `rowPress: 'open'`. */
+  onActivate?: (row: ShellRow) => void
   /**
    * What the host does when a card's `create` button is pressed. The shell
    * makes nothing itself, so a story that offers the button needs one of
@@ -137,10 +142,12 @@ export function renderShell(args: ShellStoryArgs) {
           headAlign: args.headAlign ?? 'center',
           ...(args.views ? { views: args.views } : {}),
           ...(args.within ? { within: args.within } : {}),
+          ...(args.rowPress ? { rowPress: args.rowPress } : {}),
           ...(args.defaults ? { defaults: args.defaults } : {}),
           ...(args.accent ? { accent: args.accent } : {}),
           ...(args.tokens ? { tokens: args.tokens } : {}),
           ...(args.open ? { open: true } : {}),
+          ...(args.onActivate ? { onActivate: args.onActivate } : {}),
           ...(args.onCreate ? { onCreate: args.onCreate } : {}),
           ...(args.onDuplicate ? { onDuplicate: args.onDuplicate } : {}),
           ...(args.onDelete ? { onDelete: args.onDelete } : {}),
@@ -500,6 +507,9 @@ export const ItemsPanel = defineComponent({
       toggleSelect: () => {},
       selectPage: () => {},
       clearSelection: () => {},
+      /* A panel lists records and does nothing to them: no narrowing on a
+         press, and nothing done with the press either. */
+      narrowsOnPress: computed(() => false),
       activate: () => {},
       create: () => {},
       duplicate: () => {},
