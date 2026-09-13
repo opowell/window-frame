@@ -81,6 +81,8 @@ export interface ShellStoryArgs {
   /** Token overrides passed straight to the shell. */
   tokens?: Record<string, string>
   limit?: number
+  /** What the count is short of, in the host's words, under the pager's hover. */
+  pagesNote?: string
   /** Rows inside each type's card on the home screen. */
   previewsPerType?: number
   /** Restricts the offered result views. Every one of them when unset. */
@@ -141,6 +143,7 @@ export function renderShell(args: ShellStoryArgs) {
           matchWidth: args.matchWidth ?? 'grow',
           headAlign: args.headAlign ?? 'center',
           ...(args.views ? { views: args.views } : {}),
+          ...(args.pagesNote ? { pagesNote: args.pagesNote } : {}),
           ...(args.within ? { within: args.within } : {}),
           ...(args.rowPress ? { rowPress: args.rowPress } : {}),
           ...(args.defaults ? { defaults: args.defaults } : {}),
@@ -249,14 +252,27 @@ export function longValueSource(seed = 'iRadar'): DataSource {
  * the home screen's per-type cards each run one of their own.
  */
 export function streamingSource(
-  options: { chunk?: number; every?: number; newestFirst?: boolean; seed?: string } = {},
+  options: {
+    chunk?: number
+    every?: number
+    newestFirst?: boolean
+    seed?: string
+    /**
+     * Find the whole match rather than the page asked for — what a scan does,
+     * having no way to skip to page three. The shell keeps a page of it and
+     * counts the rest, so the pager grows as the rows land.
+     */
+    whole?: boolean
+  } = {},
 ): StreamingDataSource {
-  const { chunk = 4, every = 140, newestFirst = false, seed = 'iRadar' } = options
+  const { chunk = 4, every = 140, newestFirst = false, seed = 'iRadar', whole = false } = options
   const inner = createMockDataSource({ seed })
   return {
     query: (request) => inner.query(request),
     stream(request, sink) {
-      const found = inner.query(request)
+      const found = inner.query(
+        whole ? { ...request, offset: 0, limit: Number.MAX_SAFE_INTEGER } : request,
+      )
       let next = 0
       const timer = setInterval(() => {
         // `open` goes false the moment the query moves on, and a source doing
