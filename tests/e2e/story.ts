@@ -118,17 +118,44 @@ export const listRows = (page: Page) => page.locator('.dc-list__row')
  */
 export const pager = (page: Page) => page.locator('.dc-header__pages')
 
-/** Its readout: which page of how many. */
+/**
+ * Its readout, which carries the hover text — but not, any more, the page it
+ * is on: that half of `3 / 4` is a box with a number in it.
+ */
 export const pageReadout = (page: Page) => page.locator('.dc-header__page')
+
+/** The box the page is in, and the count it is out of, beside it. */
+export const pageBox = (page: Page) => page.locator('.dc-header__page-box')
+export const pageTotal = (page: Page) => page.locator('.dc-header__page-total')
+
+/** The readout as the bar says it — the box's number and the total together. */
+export async function expectPage(
+  page: Page,
+  reads: string | RegExp,
+  options?: { timeout?: number },
+): Promise<void> {
+  const readout = expect.poll(
+    async () => `${await pageBox(page).inputValue()} ${(await pageTotal(page).innerText()).trim()}`,
+    options,
+  )
+  if (typeof reads === 'string') await readout.toBe(reads)
+  else await readout.toMatch(reads)
+}
+
+/** Types a page into the box and presses Enter, the way a jump is made. */
+export async function typePage(page: Page, wanted: string): Promise<void> {
+  await pageBox(page).fill(wanted)
+  await pageBox(page).press('Enter')
+}
 
 export const pageStep = (page: Page, which: 'Previous' | 'Next') =>
   pager(page).getByRole('button', { name: `${which} page` })
 
 /** Steps a page and waits for the readout to say it has moved. */
 export async function stepPage(page: Page, which: 'Previous' | 'Next'): Promise<void> {
-  const before = await pageReadout(page).innerText()
+  const before = await pageBox(page).inputValue()
   await pageStep(page, which).click()
-  await expect(pageReadout(page)).not.toHaveText(before)
+  await expect(pageBox(page)).not.toHaveValue(before)
 }
 
 /** The leading ordinal of each row on screen, which counts the whole result. */
