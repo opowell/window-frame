@@ -38,6 +38,7 @@ import type { WindowNode, WindowPanelDef } from '../src/window/types'
 import type { MenuItemDef } from '../src/menu/types'
 import { cascade, column, group, panelNode, row } from '../src/window/layout'
 import SelectCell from './cells/SelectCell.vue'
+import SelectHeader from './cells/SelectHeader.vue'
 import { selectedRows } from './selection'
 
 export { selectedRows }
@@ -325,7 +326,9 @@ export function failingSource(message = 'The results service is unavailable'): D
  */
 export function selectableSchema(): DomainSchema {
   const columns: ColumnDef[] = [
-    { key: 'select', kind: 'component', component: SelectCell, width: '36px' },
+    // The tick, and over it the control for every tick at once — a header of
+    // the host's own, which is what `header` is for.
+    { key: 'select', kind: 'component', component: SelectCell, header: SelectHeader, width: '36px' },
     { key: 'ordinal', kind: 'ordinal', label: '#', width: '48px' },
     { key: 'primary', role: 'identity', label: 'Item', sort: 'name', activate: true, scope: true },
     { key: 'secondary', role: 'reference', label: 'URL', mono: true, muted: true, hideBelow: 620 },
