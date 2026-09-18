@@ -34,6 +34,13 @@ export const termBar = (page: Page) => page.locator('.dc-header__terms')
 export const terms = (page: Page) => page.locator('.dc-term')
 
 /**
+ * The box at the end of that row, where the next part is written: a draft
+ * that Enter ANDs on to the query, and that empties as the part it made
+ * takes its place beside it.
+ */
+export const searchBox = (page: Page) => page.locator('.dc-header__search')
+
+/**
  * One of the three parts of the query that are not pills: which type is being
  * listed, offered as a choice among the schema's own — `Everything` among them.
  */
