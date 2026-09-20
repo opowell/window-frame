@@ -43,21 +43,52 @@ export const searchBox = (page: Page) => page.locator('.dc-header__search')
 /**
  * One of the three parts of the query that are not pills: which type is being
  * listed, offered as a choice among the schema's own — `Everything` among them.
+ *
+ * Each is the shell's own picker rather than a `<select>`: the button that
+ * says the choice and opens the list, carrying the chosen key as
+ * `data-dc-value`. What it offers is read through {@link pickOptions}.
  */
-export const scopeSelect = (page: Page) => page.locator('.dc-header__scope-select')
+export const scopeSelect = (page: Page) => page.locator('.dc-header__scope-select .dc-pick__button')
 
 /** The second: how the results are drawn. */
-export const viewSelect = (page: Page) => page.locator('.dc-header__view-select')
+export const viewSelect = (page: Page) => page.locator('.dc-header__view-select .dc-pick__button')
 
 /** The third: what they are ordered by. */
-export const sortSelect = (page: Page) => page.locator('.dc-header__sort-select')
+export const sortSelect = (page: Page) => page.locator('.dc-header__sort-select .dc-pick__button')
 
 /** And the press beside it, which runs that order the other way. */
 export const sortDirection = (page: Page) => page.locator('.dc-header__dir')
 
+/** What a picker calls its list, which is what the choice is *of*. */
+export type PickName = 'Type' | 'View' | 'Sort'
+
+/** The list one of the pickers has put up. Nothing until the picker is pressed. */
+export const pickList = (page: Page, name: PickName): Locator =>
+  page.locator(`.dc-menu[aria-label="${name}"]`)
+
+/**
+ * What that list offers, one label each, in the order it offers them — the
+ * options of the picker, once it is open.
+ */
+export const pickOptions = (page: Page, name: PickName): Locator =>
+  pickList(page, name).locator('.dc-menu__label')
+
+/** Puts a picker's list up, when it is not up already. */
+export async function openPick(page: Page, button: Locator, name: PickName): Promise<void> {
+  if (await pickList(page, name).count()) return
+  await button.click()
+  await expect(pickList(page, name)).toBeVisible()
+}
+
+/** Chooses from a picker by the key of the option, which is what the URL holds. */
+async function pick(page: Page, button: Locator, name: PickName, key: string): Promise<void> {
+  await openPick(page, button, name)
+  await pickList(page, name).locator(`[data-dc-item="${key}"]`).click()
+}
+
 /** Draws the results another way, by the view's own key. */
 export async function chooseView(page: Page, key: string): Promise<void> {
-  await viewSelect(page).selectOption(key)
+  await pick(page, viewSelect(page), 'View', key)
 }
 
 /**
@@ -66,7 +97,8 @@ export async function chooseView(page: Page, key: string): Promise<void> {
  * says too.
  */
 export async function chooseSort(page: Page, label: string): Promise<void> {
-  await sortSelect(page).selectOption({ label })
+  await openPick(page, sortSelect(page), 'Sort')
+  await pickOptions(page, 'Sort').filter({ hasText: new RegExp(`^${label}$`) }).click()
 }
 
 /**
@@ -74,8 +106,7 @@ export async function chooseSort(page: Page, label: string): Promise<void> {
  * many records that is.
  */
 export async function scopeLabel(page: Page): Promise<string> {
-  const chosen = await scopeSelect(page).locator('option:checked').textContent()
-  return (chosen ?? '').trim()
+  return ((await scopeSelect(page).textContent()) ?? '').trim()
 }
 
 /**
@@ -90,8 +121,8 @@ export async function scopeLabel(page: Page): Promise<string> {
  */
 export async function chooseScope(page: Page, label: string): Promise<void> {
   if (await scopeSelect(page).count()) {
-    const option = scopeSelect(page).locator('option').filter({ hasText: label }).first()
-    await scopeSelect(page).selectOption((await option.getAttribute('value')) ?? '')
+    await openPick(page, scopeSelect(page), 'Type')
+    await pickOptions(page, 'Type').filter({ hasText: label }).first().click()
     return
   }
   await typeCardHead(page, label).click()
@@ -106,7 +137,7 @@ export const typeCardHead = (page: Page, label: string): Locator =>
 
 /** Widens back out to the whole corpus, which is the scope chooser's first option. */
 export async function clearScope(page: Page): Promise<void> {
-  await scopeSelect(page).selectOption('')
+  await pick(page, scopeSelect(page), 'Type', '')
 }
 export const panel = (page: Page) => page.locator('.dc-panel')
 
