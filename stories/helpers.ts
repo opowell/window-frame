@@ -455,6 +455,7 @@ const VIEW_LABELS: Record<ViewKind, string> = {
   list: 'List',
   cards: 'Cards',
   grid: 'Grid',
+  images: 'Images',
   table: 'Table',
   links: 'Links',
   preview: 'Preview',
