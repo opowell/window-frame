@@ -41,8 +41,10 @@ export const terms = (page: Page) => page.locator('.dc-term')
 export const searchBox = (page: Page) => page.locator('.dc-header__search')
 
 /**
- * One of the three parts of the query that are not pills: which type is being
+ * One of the two parts of the query that are not pills: which type is being
  * listed, offered as a choice among the schema's own — `Everything` among them.
+ * On the bar only while a type is chosen: on `Everything` the content names
+ * the types, and the bar leaves the choice to it.
  *
  * Each is the shell's own picker rather than a `<select>`: the button that
  * says the choice and opens the list, carrying the chosen key as
@@ -53,14 +55,17 @@ export const scopeSelect = (page: Page) => page.locator('.dc-header__scope-selec
 /** The second: how the results are drawn. */
 export const viewSelect = (page: Page) => page.locator('.dc-header__view-select .dc-pick__button')
 
-/** The third: what they are ordered by. */
-export const sortSelect = (page: Page) => page.locator('.dc-header__sort-select .dc-pick__button')
-
-/** And the press beside it, which runs that order the other way. */
-export const sortDirection = (page: Page) => page.locator('.dc-header__dir')
+/**
+ * What they are ordered by is not on the bar at all: the table's own headings
+ * offer it, with the column on screen under them. This is the button in the
+ * heading named `label`, which orders by that column — and, pressed again,
+ * runs the same order the other way.
+ */
+export const sortHeading = (page: Page, label: string): Locator =>
+  page.locator('.dc-table__sort', { hasText: new RegExp(`^${label}$`) })
 
 /** What a picker calls its list, which is what the choice is *of*. */
-export type PickName = 'Type' | 'View' | 'Sort'
+export type PickName = 'Type' | 'View'
 
 /** The list one of the pickers has put up. Nothing until the picker is pressed. */
 export const pickList = (page: Page, name: PickName): Locator =>
@@ -92,16 +97,6 @@ export async function chooseView(page: Page, key: string): Promise<void> {
 }
 
 /**
- * Orders them by another column, named as the schema names it — the label is
- * what the chooser shows, and what a table heading offering the same order
- * says too.
- */
-export async function chooseSort(page: Page, label: string): Promise<void> {
-  await openPick(page, sortSelect(page), 'Sort')
-  await pickOptions(page, 'Sort').filter({ hasText: new RegExp(`^${label}$`) }).click()
-}
-
-/**
  * What the type control says it is listing: the type's name and, after it, how
  * many records that is.
  */
@@ -110,14 +105,13 @@ export async function scopeLabel(page: Page): Promise<string> {
 }
 
 /**
- * Lists another type, by the name the schema gave it — however the bar offers
- * it.
+ * Lists another type, by the name the schema gave it — however the screen
+ * offers it.
  *
- * Usually that is the chooser, and the option says a count after the name, so
- * the match is on the name alone. On the card-per-type screen there is no
- * chooser: every card is headed by its type and pressing that heading is the
- * same move, so the bar does not offer the choice twice. That heading is what
- * this presses there, which is also the path a reader takes.
+ * With a type chosen that is the bar's chooser, and the option says a count
+ * after the name, so the match is on the name alone. On `Everything` there is
+ * no chooser: every card of the home screen is headed by its type and pressing
+ * that heading is the move, which is also the path a reader takes.
  */
 export async function chooseScope(page: Page, label: string): Promise<void> {
   if (await scopeSelect(page).count()) {
@@ -125,7 +119,16 @@ export async function chooseScope(page: Page, label: string): Promise<void> {
     await pickOptions(page, 'Type').filter({ hasText: label }).first().click()
     return
   }
+  // The card is content, and the open panel's scrim covers content: the panel
+  // comes down for the press and goes back up after it, so a test that was
+  // reading the panel goes on reading it.
+  const wasOpen = (await panel(page).count()) > 0
+  if (wasOpen) {
+    await page.keyboard.press('Escape')
+    await panel(page).waitFor({ state: 'hidden' })
+  }
   await typeCardHead(page, label).click()
+  if (wasOpen) await openPanel(page)
 }
 
 /** The heading of one type's card, which filters the results to that type. */
