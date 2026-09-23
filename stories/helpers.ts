@@ -509,6 +509,7 @@ export const ItemsPanel = defineComponent({
       offset: results.offset,
       pageCount: results.pageCount,
       pending: results.pending,
+      counting: results.counting,
       error: results.error,
       source,
       previewsPerType: computed(() => 3),
