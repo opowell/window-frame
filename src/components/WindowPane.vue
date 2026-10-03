@@ -568,7 +568,11 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
   padding: 0 8px 0 12px;
   border-bottom: 1px solid var(--dc-line);
   background: var(--dc-bg-2);
-  min-height: 36px;
+  /* One height, whatever is in it: switching tabs swaps the actions at the
+     right, and a strip that grew to fit the tallest of them would jump each
+     time. Tools taller than the strip have to fit themselves to it. */
+  height: 36px;
+  box-sizing: border-box;
 }
 
 .dc-pane__head[data-dc-movable='true'] {
@@ -670,6 +674,13 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
   color: var(--dc-fg-1);
 }
 
+/* A tab that is not on top is a thing to press. The one on top has nothing to
+   do when pressed, so it keeps the strip's cursor — a grab where the strip
+   moves the window. */
+.dc-pane[data-dc-tabbed='true'] .dc-tab[aria-selected='false'] {
+  cursor: pointer;
+}
+
 .dc-pane[data-dc-tabbed='true'] .dc-tab[aria-selected='true'] {
   border-bottom-color: var(--dc-accent);
   background: var(--dc-bg-1);
@@ -709,7 +720,6 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
   align-items: center;
   gap: 6px;
   margin-left: auto;
-  padding: 5px 0;
 }
 
 .dc-pane__controls {

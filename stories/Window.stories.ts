@@ -249,6 +249,39 @@ export const TabsOnly = story({
   content: CONTENT,
 })
 
+/**
+ * Each tab bringing controls of its own to the strip — here a button as tall
+ * as a page's, on one tab only. The strip is one height whichever tab is on
+ * top: what a tab brings has to fit the strip, rather than the strip growing to
+ * fit it and jumping as the tabs are switched.
+ */
+export const TabsWithActions = story({
+  panels: [ITEMS, SOURCES, ACTIVITY],
+  layout: group(['items', 'sources', 'activity']),
+  movable: true,
+  content: CONTENT,
+  actions: {
+    sources: () =>
+      h('button', { type: 'button', class: 'sb-tall-action', style: 'padding: 12px 14px' }, 'Run all'),
+  },
+})
+
+/**
+ * The layout held in the address bar: open, move or switch a tab and the
+ * `w` parameter follows, and a reload — or the link, sent to someone — opens
+ * the window as it was left. While the window is as it opened, there is none.
+ */
+export const LayoutInUrl = story({
+  panels: [ITEMS, SOURCES, ACTIVITY, LOG],
+  layout: row(
+    [panelNode('items'), group(['sources', 'activity', 'log'], 'activity')],
+    [0.58, 0.42],
+  ),
+  movable: true,
+  content: CONTENT,
+  liveUrl: true,
+})
+
 /** Tabs at any depth of the grid, mixed with panes that have none. */
 export const TabsAndSplits = story({
   panels: [ITEMS, SOURCES, ACTIVITY, LOG, NOTES],

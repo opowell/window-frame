@@ -1,4 +1,4 @@
-import { computed, defineComponent, h, ref, watch } from 'vue'
+import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import DataShell from '../src/components/DataShell.vue'
 import FacetControl from '../src/components/FacetControl.vue'
@@ -8,6 +8,7 @@ import WindowFrame from '../src/components/WindowFrame.vue'
 import MenuBar from '../src/components/MenuBar.vue'
 import { provideShellContext } from '../src/composables/context'
 import { usePaneMenu } from '../src/composables/paneMenu'
+import { useLayoutRoute } from '../src/composables/useLayoutRoute'
 import { useQueryState } from '../src/composables/useQueryState'
 import { useResults } from '../src/composables/useResults'
 import { drillExpression } from '../src/query/drill'
@@ -623,6 +624,10 @@ export interface WindowStoryArgs {
   menu?: boolean
   /** Whether a strip that is a named space says that name beside its tabs. */
   spaceNames?: boolean
+  /** Controls at the right of a panel's strip, per panel id. */
+  actions?: Record<string, () => unknown>
+  /** Hold the layout in the real address bar, through `useLayoutRoute`. */
+  liveUrl?: boolean
 }
 
 /**
@@ -636,6 +641,11 @@ export function renderWindow(args: WindowStoryArgs) {
       const panels = ref<WindowPanelDef[]>([...args.panels])
       const layout = ref<WindowNode | null>(args.layout ?? null)
       const views = ref<Record<string, string>>({ ...args.views })
+      if (args.liveUrl) {
+        const adapter = createHistoryAdapter()
+        onBeforeUnmount(() => adapter.dispose?.())
+        useLayoutRoute(layout, { adapter, home: args.layout ?? null })
+      }
 
       /* Closing is a request the host answers: the window emits and nothing
          else, so a panel stays until it is filtered out of `panels` here. */
@@ -646,6 +656,9 @@ export function renderWindow(args: WindowStoryArgs) {
       const slots: Record<string, (props: { panel: WindowPanelDef; view: string }) => unknown> = {}
       for (const [id, render] of Object.entries(args.content ?? {})) {
         slots[`panel-${id}`] = ({ view }) => render(view)
+      }
+      for (const [id, render] of Object.entries(args.actions ?? {})) {
+        slots[`actions-${id}`] = () => render()
       }
 
       const win = () =>

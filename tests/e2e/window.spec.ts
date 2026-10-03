@@ -2712,3 +2712,65 @@ test.describe('Window — a space with no title bar', () => {
     expect(await frameOrder(page)).toEqual(['log', 'items'])
   })
 })
+
+test.describe('Window — the strip', () => {
+  const WITH_ACTIONS = 'window-panel-grid--tabs-with-actions'
+
+  test('keeps one height whichever tab is on top, whatever that tab brings', async ({ page }) => {
+    await gotoStory(page, WITH_ACTIONS)
+    const height = async () => (await paneHead(page, 'items').boundingBox())?.height
+    const plain = await height()
+    await tab(page, 'sources').click()
+    await expect(paneHead(page, 'sources').locator('.sb-tall-action')).toBeVisible()
+    expect(await height()).toBe(plain)
+    await tab(page, 'activity').click()
+    expect(await height()).toBe(plain)
+  })
+
+  test('a tab that is not on top shows it can be pressed', async ({ page }) => {
+    await gotoStory(page, TABS)
+    const cursor = (id: string) => tab(page, id).evaluate((el) => getComputedStyle(el).cursor)
+    expect(await cursor('sources')).toBe('pointer')
+    expect(await cursor('log')).toBe('pointer')
+    // The one on top has nothing to do when pressed, and keeps the strip's grab.
+    expect(await cursor('activity')).toBe('grab')
+  })
+})
+
+test.describe('Window — the layout in the URL', () => {
+  const IN_URL = 'window-panel-grid--layout-in-url'
+  const layoutParam = (page: Page) => new URL(page.url()).searchParams.get('w')
+
+  test('says nothing while the window is as it opened', async ({ page }) => {
+    await gotoStory(page, IN_URL)
+    expect(layoutParam(page)).toBeNull()
+  })
+
+  test('follows a switched tab, and a reload opens the window as it was left', async ({ page }) => {
+    await gotoStory(page, IN_URL)
+    await tab(page, 'log').click()
+    await expect.poll(() => layoutParam(page)).toContain('a:log')
+    // The story's own parameters are left as they were.
+    expect(new URL(page.url()).searchParams.get('id')).toBe(IN_URL)
+
+    await page.reload()
+    await page.locator('.dc-shell').first().waitFor({ state: 'visible' })
+    await expect(tab(page, 'log')).toHaveAttribute('aria-selected', 'true')
+    await expect(pane(page, 'log')).toContainText('fetch failed')
+  })
+
+  test('follows the panels moved into one strip', async ({ page }) => {
+    await gotoStory(page, IN_URL)
+    await choosePaneMenu(page, 'activity', 'show-row')
+    await expect.poll(() => layoutParam(page)).not.toBeNull()
+    const moved = layoutParam(page)
+
+    await page.reload()
+    await page.locator('.dc-shell').first().waitFor({ state: 'visible' })
+    expect(layoutParam(page)).toBe(moved)
+    // Three panes side by side now, none of them tabbed.
+    for (const id of ['sources', 'activity', 'log']) {
+      await expect(pane(page, id)).toHaveAttribute('data-dc-tabbed', 'false')
+    }
+  })
+})
