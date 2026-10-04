@@ -13,7 +13,7 @@
  *
  * `.dc-pane` rather than `.dc-panel`, which the query panel already owns.
  */
-import { computed, useId } from 'vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
 import type { WindowGroup, WindowNode, WindowPanelDef } from '../window/types'
 import {
   activePanel,
@@ -30,6 +30,7 @@ import { useWindowContext } from '../composables/windowContext'
 import { providePaneContext } from '../composables/paneMenu'
 import MenuButton from './MenuButton.vue'
 import WindowGlyph from './WindowGlyph.vue'
+import WindowPaneBody from './WindowPaneBody.vue'
 
 const props = defineProps<{
   group: WindowGroup
@@ -145,8 +146,9 @@ const closable = (id: string) => win.closable(id)
 /*
  * What the content inside this pane is told about it: which panel it belongs
  * to, which is what lets it put items in that panel's own menu without being
- * handed an id it has no way to know. Only the tab on top is rendered, so that
- * tab is the panel the content is.
+ * handed an id it has no way to know. The actions in the strip are the tab on
+ * top's; each panel's body provides its own, since a panel kept alive behind
+ * the others is still itself and not the tab on top (see WindowPaneBody).
  */
 providePaneContext({ panel: activeId })
 
@@ -188,11 +190,39 @@ const dropIndex = computed(() => drop.value?.index ?? null)
  * sits an arbitrary number of splits below the window, and forwarding slots
  * through each one would make the depth of the tree part of every signature.
  *
- * Only the tab on top is rendered. A host that needs a background tab to keep
- * its state holds that state outside the slot.
+ * Only the tab on top is rendered, unless a panel asks to be kept alive: then
+ * it stays mounted behind the others, hidden, so an iframe or a live
+ * connection inside it survives a switch of tabs. Kept in the order of the
+ * strip, so bringing one forward never moves another in the DOM.
  */
-const Content = () =>
-  active.value ? (win.renderContent(active.value, view.value, isFocused.value) ?? null) : null
+const bodies = computed(() =>
+  tabs.value.flatMap((tab) =>
+    tab.kind === 'panel' && (tab.id === activeId.value || tab.panel.keepAlive === true) ? [tab.id] : [],
+  ),
+)
+
+/*
+ * The body scrolls, and every panel rendered in it shares that one scroll
+ * position. A panel kept alive gets its own back when it returns to the top;
+ * one rendered afresh starts wherever the body happens to be, as it always did.
+ */
+const body = ref<HTMLElement | null>(null)
+const scrolls = new Map<string, number>()
+watch(
+  activeId,
+  (next, previous) => {
+    const el = body.value
+    if (!el) return
+    if (previous) scrolls.set(previous, el.scrollTop)
+    if (!win.panelFor(next)?.keepAlive || !scrolls.has(next)) return
+    const top = scrolls.get(next)!
+    void nextTick(() => {
+      if (body.value) body.value.scrollTop = top
+    })
+  },
+  { flush: 'pre' },
+)
+
 const Actions = () =>
   active.value ? (win.renderActions(active.value, view.value, isFocused.value) ?? null) : null
 
@@ -507,14 +537,23 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
 
     <!-- A headless pane has no strip, so its body is a plain box rather than a
          tab panel: the tab it would name is not on screen to name it. -->
+    <!-- Kept mounted under a space on top when it holds panels kept alive. -->
     <div
-      v-else
-      :id="bodyId"
+      v-if="!space || bodies.length"
+      v-show="!space"
+      :id="space ? undefined : bodyId"
+      ref="body"
       class="dc-pane__body"
-      :role="headless ? undefined : 'tabpanel'"
-      :aria-labelledby="headless ? undefined : tabId(activeId)"
+      :role="headless || space ? undefined : 'tabpanel'"
+      :aria-labelledby="headless || space ? undefined : tabId(activeId)"
     >
-      <Content />
+      <WindowPaneBody
+        v-for="id in bodies"
+        v-show="id === activeId"
+        :key="id"
+        :panel="id"
+        :active="id === activeId && isFocused"
+      />
     </div>
 
     <!-- Where the panel being carried would land. Purely a preview: the drop

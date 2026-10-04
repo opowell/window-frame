@@ -282,6 +282,16 @@ export interface WindowPanelDef {
    * host drops the panel from `panels`, which is what actually removes it.
    */
   closable?: boolean
+  /**
+   * Keeps this panel's content mounted while another tab of its pane is on
+   * top, hidden rather than torn down — for content that is expensive or
+   * impossible to rebuild: a page in an iframe, a live connection, a form
+   * half-filled. Its scroll position comes back with it.
+   *
+   * Kept within its pane: moving the panel to another one, or closing it,
+   * still renders it afresh there.
+   */
+  keepAlive?: boolean
 }
 
 /** A completed drag or keyboard move, reported by the window. */

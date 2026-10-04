@@ -2774,3 +2774,68 @@ test.describe('Window — the layout in the URL', () => {
     }
   })
 })
+
+test.describe('panels kept alive', () => {
+  const KEEP = 'window-panel-grid--keep-alive'
+  const notes = (page: Page) => page.getByRole('textbox', { name: 'Notes', exact: true })
+  const activityNotes = (page: Page) => page.getByRole('textbox', { name: 'Activity notes' })
+  const content = (page: Page, id: string) => page.locator(`.dc-pane__content[data-dc-panel="${id}"]`)
+
+  test('keeps what was typed across a switch of tabs; an ordinary panel does not', async ({ page }) => {
+    await gotoStory(page, KEEP)
+    await notes(page).fill('kept')
+    await tab(page, 'activity').click()
+    await activityNotes(page).fill('lost')
+
+    await tab(page, 'notes').click()
+    await expect(notes(page)).toHaveValue('kept')
+    await tab(page, 'activity').click()
+    await expect(activityNotes(page)).toHaveValue('')
+  })
+
+  test('is set up once, and hidden rather than removed while another tab is on top', async ({ page }) => {
+    await gotoStory(page, KEEP)
+    await tab(page, 'sources').click()
+    await expect(content(page, 'notes')).toBeAttached()
+    await expect(content(page, 'notes')).toBeHidden()
+    await expect(content(page, 'sources')).toBeVisible()
+    // An ordinary tab that is not on top is not rendered at all.
+    await expect(content(page, 'activity')).toHaveCount(0)
+
+    await tab(page, 'activity').click()
+    await tab(page, 'notes').click()
+    await expect(pane(page, 'notes')).toContainText('Set up 1 time')
+  })
+
+  test('keeps its menu items in its own menu while it is hidden', async ({ page }) => {
+    await gotoStory(page, KEEP)
+    await openPaneMenu(page, 'notes')
+    await expect(menuItem(page, 'clear-notes')).toBeVisible()
+    await page.keyboard.press('Escape')
+
+    await tab(page, 'sources').click()
+    await openPaneMenu(page, 'sources')
+    await expect(menus(page).first()).toBeVisible()
+    await expect(menuItem(page, 'clear-notes')).toHaveCount(0)
+  })
+
+  test('returns to where it was scrolled', async ({ page }) => {
+    await gotoStory(page, KEEP)
+    const body = pane(page, 'notes').locator('.dc-pane__body')
+    await body.evaluate((el) => (el.scrollTop = 300))
+    await tab(page, 'sources').click()
+    await body.evaluate((el) => (el.scrollTop = 0))
+    await tab(page, 'notes').click()
+    await expect.poll(() => body.evaluate((el) => el.scrollTop)).toBe(300)
+  })
+
+  test('is set up afresh in a pane it is moved to', async ({ page }) => {
+    await gotoStory(page, KEEP)
+    await notes(page).fill('kept')
+    await choosePaneMenu(page, 'notes', 'show-row')
+    // Moved out of the strip into a pane of its own: a new pane, so a new body.
+    await expect(pane(page, 'notes')).toHaveAttribute('data-dc-tabbed', 'false')
+    await expect(pane(page, 'notes')).toContainText('Set up 2 times')
+    await expect(notes(page)).toHaveValue('')
+  })
+})

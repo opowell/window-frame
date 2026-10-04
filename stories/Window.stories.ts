@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
-import { h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import WindowFrame from '../src/components/WindowFrame.vue'
+import { usePaneMenu } from '../src/composables/paneMenu'
 import {
   cascade,
   column,
@@ -673,6 +674,57 @@ export const ContentMenu = story({
   layout: row([panelNode('items'), column([panelNode('sources'), panelNode('activity')])], [0.62, 0.38]),
   movable: true,
   content: { ...CONTENT, items: () => h(ItemsPanel, { ownMenu: true }) },
+})
+
+/**
+ * A note pad that counts how often it has been set up, and offers an item in
+ * its own panel's menu — enough to see what keeping a panel alive keeps.
+ */
+let notesMounted = 0
+const KeptNotes = defineComponent({
+  name: 'KeptNotes',
+  setup() {
+    const mounts = ++notesMounted
+    const text = ref('')
+    usePaneMenu(() => [{ id: 'clear-notes', label: 'Clear notes', action: () => (text.value = '') }])
+    return () =>
+      h('div', { class: 'sb-kept' }, [
+        h('p', { class: 'sb-kept__mounts' }, `Set up ${mounts} ${mounts === 1 ? 'time' : 'times'}`),
+        h('textarea', {
+          class: 'sb-kept__text',
+          'aria-label': 'Notes',
+          value: text.value,
+          onInput: (event: Event) => (text.value = (event.target as HTMLTextAreaElement).value),
+        }),
+        ...Array.from({ length: 60 }, (_, i) => h('p', { class: 'sb-kept__line' }, `Line ${i + 1}`)),
+      ])
+  },
+})
+
+/**
+ * `keepAlive` on a panel keeps its content mounted while another tab of its
+ * pane is on top — hidden rather than torn down. Type in *Notes*, switch to
+ * *Activity* and back: the text, the scroll position and the count of times it
+ * was set up are all where they were. *Activity* is an ordinary panel, so what
+ * is typed in it is gone after a trip to another tab.
+ *
+ * For content that is expensive or impossible to rebuild: a page in an iframe,
+ * a live connection, a half-filled form. Its menu items stay its own while it
+ * is hidden — they are in *Notes*' menu, never in the menu of the tab on top.
+ */
+export const KeepAlive = story({
+  panels: [
+    { id: 'notes', title: 'Notes', subtitle: 'kept alive', keepAlive: true },
+    SOURCES,
+    ACTIVITY,
+  ],
+  layout: group(['notes', 'sources', 'activity'], 'notes'),
+  movable: true,
+  content: {
+    ...CONTENT,
+    notes: () => h(KeptNotes),
+    activity: () => h('textarea', { class: 'sb-kept__text', 'aria-label': 'Activity notes' }),
+  },
 })
 
 /**
