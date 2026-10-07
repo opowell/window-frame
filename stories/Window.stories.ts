@@ -283,6 +283,23 @@ export const LayoutInUrl = story({
   liveUrl: true,
 })
 
+/**
+ * Any panel popped out to a browser window of its own, from its menu: the new
+ * window holds that panel and nothing else — not the panels it was beside, nor
+ * the space it was in — and this one no longer holds it.
+ */
+export const PopOut = story({
+  panels: [ITEMS, SOURCES, ACTIVITY, LOG],
+  layout: row(
+    [panelNode('items'), group(['sources', 'activity', 'log'], 'activity')],
+    [0.58, 0.42],
+  ),
+  movable: true,
+  content: CONTENT,
+  liveUrl: true,
+  popOut: true,
+})
+
 /** Tabs at any depth of the grid, mixed with panes that have none. */
 export const TabsAndSplits = story({
   panels: [ITEMS, SOURCES, ACTIVITY, LOG, NOTES],

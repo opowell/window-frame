@@ -2775,6 +2775,50 @@ test.describe('Window — the layout in the URL', () => {
   })
 })
 
+test.describe('Window — popping a panel out', () => {
+  const POP = 'window-panel-grid--pop-out'
+
+  test('opens the panel alone in a browser window of its own, and takes it out of this one', async ({ page }) => {
+    await gotoStory(page, POP)
+    await openPaneMenu(page, 'activity')
+    const opened = page.waitForEvent('popup')
+    await menuItem(page, 'pop-out').click()
+    const popup = await opened
+    await popup.locator('.dc-shell').first().waitFor({ state: 'visible' })
+
+    // Only the panel: none of the tabs it shared a strip with, not the panel
+    // beside that strip, and no bar of its own over it — the browser window
+    // it is in names it.
+    await expect(popup.locator('.dc-pane')).toHaveCount(1)
+    await expect(pane(popup, 'activity')).toHaveAttribute('data-dc-headless', 'true')
+    for (const id of ['items', 'sources', 'log']) await expect(pane(popup, id)).toHaveCount(0)
+    expect(new URL(popup.url()).searchParams.get('solo')).toBe('1')
+
+    // Moved, not copied.
+    await expect(pane(page, 'activity')).toHaveCount(0)
+    await expect(tabNames(page, 'sources')).resolves.toEqual(['Sources', 'Log'])
+  })
+
+  test('keeps a popped-out window to its panel across a reload', async ({ page }) => {
+    await gotoStory(page, POP)
+    await openPaneMenu(page, 'items')
+    const opened = page.waitForEvent('popup')
+    await menuItem(page, 'pop-out').click()
+    const popup = await opened
+    await popup.locator('.dc-shell').first().waitFor({ state: 'visible' })
+    await popup.reload()
+    await popup.locator('.dc-shell').first().waitFor({ state: 'visible' })
+    await expect(popup.locator('.dc-pane')).toHaveCount(1)
+    await expect(pane(popup, 'items')).toBeVisible()
+  })
+
+  test('is offered only where the host gives a panel somewhere to go', async ({ page }) => {
+    await gotoStory(page, 'window-panel-grid--layout-in-url')
+    await openPaneMenu(page, 'activity')
+    await expect(menuItem(page, 'pop-out')).toHaveCount(0)
+  })
+})
+
 test.describe('panels kept alive', () => {
   const KEEP = 'window-panel-grid--keep-alive'
   const notes = (page: Page) => page.getByRole('textbox', { name: 'Notes', exact: true })

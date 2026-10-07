@@ -9,6 +9,7 @@ import MenuBar from '../src/components/MenuBar.vue'
 import { provideShellContext } from '../src/composables/context'
 import { usePaneMenu } from '../src/composables/paneMenu'
 import { useLayoutRoute } from '../src/composables/useLayoutRoute'
+import type { LayoutRoute } from '../src/composables/useLayoutRoute'
 import { useQueryState } from '../src/composables/useQueryState'
 import { useResults } from '../src/composables/useResults'
 import { drillExpression } from '../src/query/drill'
@@ -636,6 +637,12 @@ export interface WindowStoryArgs {
   actions?: Record<string, () => unknown>
   /** Hold the layout in the real address bar, through `useLayoutRoute`. */
   liveUrl?: boolean
+  /**
+   * Lets a panel be popped out to a browser window of its own, holding it and
+   * nothing else — and taken out of this one once it is. Needs `liveUrl`: the
+   * popped-out window is this page, opened at that panel's `popOutHref`.
+   */
+  popOut?: boolean
 }
 
 /**
@@ -649,11 +656,13 @@ export function renderWindow(args: WindowStoryArgs) {
       const panels = ref<WindowPanelDef[]>([...args.panels])
       const layout = ref<WindowNode | null>(args.layout ?? null)
       const views = ref<Record<string, string>>({ ...args.views })
+      let route: LayoutRoute | null = null
       if (args.liveUrl) {
         const adapter = createHistoryAdapter()
         onBeforeUnmount(() => adapter.dispose?.())
-        useLayoutRoute(layout, { adapter, home: args.layout ?? null })
+        route = useLayoutRoute(layout, { adapter, home: args.layout ?? null })
       }
+      const popOut = args.popOut && route ? (panel: WindowPanelDef) => route!.popOutHref(panel.id) : undefined
 
       /* Closing is a request the host answers: the window emits and nothing
          else, so a panel stays until it is filtered out of `panels` here. */
@@ -686,6 +695,15 @@ export function renderWindow(args: WindowStoryArgs) {
             resizable: args.resizable ?? true,
             closable: args.closable ?? false,
             onPanelClose: closePanel,
+            ...(popOut
+              ? {
+                  popOut,
+                  solo: route!.solo.value,
+                  // Moved, not copied: once it is open in a window of its own
+                  // it is no longer in this one.
+                  onPanelPopOut: ({ panel }: { panel: string }) => closePanel(panel),
+                }
+              : {}),
             menu: args.menu ?? true,
             spaceNames: args.spaceNames ?? true,
             theme: args.theme ?? 'minimal',

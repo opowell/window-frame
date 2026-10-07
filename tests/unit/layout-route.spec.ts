@@ -189,6 +189,30 @@ describe('useLayoutRoute', () => {
     }
   })
 
+  it('pops a panel out to this page holding that panel alone, marked solo', () => {
+    const { route } = setup('?q=game:"civ1"')
+    const href = route.popOutHref('play:9')
+    expect(href).toBe("/console/?q=game:\"civ1\"&w=(g:!('play:9'),h:!t)&solo=1")
+    const search = href.slice(href.indexOf('?'))
+    const popped = setup(search)
+    expect(popped.layout.value).toEqual(headless(panelNode('play:9')))
+    expect(popped.route.solo.value).toBe(true)
+  })
+
+  it('is solo only in a window opened at a pop-out address', () => {
+    const { route } = setup('?q=x')
+    expect(route.solo.value).toBe(false)
+  })
+
+  it('keeps a popped-out window solo as its layout changes', async () => {
+    const { adapter, layout, route } = setup(new URL(setup().route.popOutHref('a'), 'http://x').search)
+    layout.value = insertPanel(layout.value!, 'b', 'a', 'right')
+    await nextTick()
+    route.flush()
+    expect(adapter.search.value).toContain('solo=1')
+    expect(route.solo.value).toBe(true)
+  })
+
   it('writes a change still waiting when its scope ends', async () => {
     const adapter = createMemoryAdapter('', '/')
     const layout = ref<WindowNode | null>(home())

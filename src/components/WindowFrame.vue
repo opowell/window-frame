@@ -57,6 +57,7 @@ import {
   nodeAt,
   normalizeLayout,
   onlySpace,
+  panelIds,
   placesOf,
   raisedPath,
   raiseFrameAt,
@@ -75,6 +76,7 @@ import {
 } from '../window/layout'
 import type { DropTarget, MoveDirection } from '../composables/windowContext'
 import { provideWindowContext } from '../composables/windowContext'
+import { openPopOut, popOutRect } from '../window/popOut'
 import WindowNodeView from './WindowNode.vue'
 
 const props = withDefaults(
@@ -122,6 +124,25 @@ const props = withDefaults(
      * appended, or something else entirely.
      */
     paneMenu?: (panel: WindowPanelDef, items: MenuItemDef[]) => MenuItemDef[]
+    /**
+     * Where a panel pops out to: the address of a page showing that panel and
+     * nothing else (`useLayoutRoute`'s `popOutHref` is one). A panel it gives
+     * an address for has *Pop out to new window* in its menu, which opens that
+     * address in a browser window of its own, the size of the pane, and emits
+     * `panel-pop-out`. `null` or nothing leaves a panel where it is.
+     *
+     * The window does not take the panel out of itself: a host that wants it
+     * gone once it is open elsewhere — a panel in two windows is two copies of
+     * it — drops it from `panels` in answer to the event.
+     */
+    popOut?: (panel: WindowPanelDef) => string | null | undefined
+    /**
+     * Holds the panels the layout names and no others. A window ordinarily puts
+     * every one of `panels` somewhere, adding any the layout leaves out; one
+     * popped out of another for a single panel (`useLayoutRoute`'s `solo`)
+     * would get back everything it was popped out *from*.
+     */
+    solo?: boolean
     /** Overrides the `--dc-accent` token. Shorthand for `tokens`. */
     accent?: string
     /** Design tokens set on the window element — `{ '--dc-surface': '#101418' }`. */
@@ -140,6 +161,7 @@ const props = withDefaults(
     resizable: true,
     minPanelSize: 120,
     closable: false,
+    solo: false,
     menu: true,
     spaceNames: true,
     theme: 'minimal',
@@ -165,6 +187,11 @@ const emit = defineEmits<{
    * it from `panels` to do that, and the layout reconciles around it.
    */
   'panel-close': [panel: string]
+  /**
+   * A panel was popped out: its `popOut` address is open in a browser window
+   * of its own. Not emitted when the browser refused to open one.
+   */
+  'panel-pop-out': [popped: { panel: string; href: string }]
 }>()
 
 /**
@@ -195,7 +222,19 @@ const ids = computed(() => props.panels.map((panel) => panel.id))
  * exist. A stored layout naming a panel that has since gone, or missing one
  * that has since appeared, renders anyway rather than leaving a hole.
  */
-const resolved = computed(() => reconcileLayout(layout.value, ids.value))
+const resolved = computed(() => reconcileLayout(layout.value, shownIds.value))
+
+/**
+ * The panels the window puts somewhere: all of them — or, in a `solo` window,
+ * those its layout names. A solo layout naming none of them is a window with
+ * nothing to hold, which shows them all rather than nothing.
+ */
+const shownIds = computed(() => {
+  if (!props.solo || !layout.value) return ids.value
+  const named = new Set(panelIds(layout.value))
+  const kept = ids.value.filter((id) => named.has(id))
+  return kept.length ? kept : ids.value
+})
 
 const focused = ref<string | null>(null)
 const dragging = ref<string | null>(null)
@@ -1604,12 +1643,39 @@ function menuFor(id: string): MenuItemDef[] {
   if (forPanel.length && own?.panel.length) forPanel.push({ separator: true })
   if (own) forPanel.push(...own.panel)
 
+  const out = popOutItem(panel)
+  if (out) {
+    if (forPanel.length) forPanel.push({ separator: true })
+    forPanel.push(out)
+  }
+
   const items = sectioned([
     { id: 'about-panel', title: panel.title, items: forPanel },
     { id: 'about-tabs', title: own?.tabsTitle ?? '', items: own?.tabs ?? [] },
   ])
 
   return props.paneMenu ? props.paneMenu(panel, items) : items
+}
+
+/**
+ * *Pop out to new window*, for a panel the host gave an address to pop out to.
+ *
+ * Last of the panel's own items: it takes the panel away from everything else
+ * on the menu. Not offered for the only panel of a window popped out already —
+ * a second window holding exactly what this one holds is a copy, not a move.
+ */
+function popOutItem(panel: WindowPanelDef): MenuItemDef | null {
+  const href = props.popOut?.(panel)
+  if (!href) return null
+  if (props.solo && resolved.value && panelIds(resolved.value).length <= 1) return null
+  return {
+    id: 'pop-out',
+    label: 'Pop out to new window',
+    action: () => {
+      const pane = root.value?.querySelector(`.dc-pane[data-dc-panel="${CSS.escape(panel.id)}"]`)
+      if (openPopOut(href, popOutRect(pane))) emit('panel-pop-out', { panel: panel.id, href })
+    },
+  }
 }
 
 /* ----------------------------------------------------------------- context */
