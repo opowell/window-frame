@@ -545,6 +545,10 @@ export const ItemsPanel = defineComponent({
       drill: (row, entity) => {
         query.narrow(drillExpression(props.schema, query.query.value, row), entity?.key ?? null)
       },
+      /* Where that drill goes, so a metric is a link; a row's press goes nowhere here. */
+      drillHref: (row, entity) =>
+        query.narrowHref(drillExpression(props.schema, query.query.value, row), entity?.key ?? null),
+      pressHref: () => null,
     })
 
     watch(
