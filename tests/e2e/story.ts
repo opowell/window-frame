@@ -35,8 +35,8 @@ export const terms = (page: Page) => page.locator('.dc-term')
 
 /**
  * The box at the end of that row, where the next part is written: a draft
- * that Enter ANDs on to the query, and that empties as the part it made
- * takes its place beside it.
+ * the results are read under as it is typed, that Enter ANDs on to the
+ * query, and that empties as the part it made takes its place beside it.
  */
 export const searchBox = (page: Page) => page.locator('.dc-header__search')
 
