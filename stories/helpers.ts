@@ -118,6 +118,8 @@ export interface ShellStoryArgs {
    */
   onDuplicate?: (selection: Selection) => void
   onDelete?: (selection: Selection) => void
+  /** And when one of the type's own `operations` is, by its key. */
+  onOperate?: (key: string, selection: Selection) => void
 }
 
 /**
@@ -156,6 +158,7 @@ export function renderShell(args: ShellStoryArgs) {
           ...(args.onCreate ? { onCreate: args.onCreate } : {}),
           ...(args.onDuplicate ? { onDuplicate: args.onDuplicate } : {}),
           ...(args.onDelete ? { onDelete: args.onDelete } : {}),
+          ...(args.onOperate ? { onOperate: args.onOperate } : {}),
         }, args.slots)
 
       const hosted = () =>
@@ -536,6 +539,7 @@ export const ItemsPanel = defineComponent({
       create: () => {},
       duplicate: () => {},
       delete: () => {},
+      operate: () => {},
       /*
        * The reference host: a drill is an expression term plus, when the press
        * was a metric rather than the row, the entity to list afterwards. The

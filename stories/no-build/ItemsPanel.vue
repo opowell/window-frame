@@ -77,6 +77,7 @@ provideShellContext({
   create: () => {},
   duplicate: () => {},
   delete: () => {},
+  operate: () => {},
   pressHref: () => null,
   drillHref: () => null,
 })
