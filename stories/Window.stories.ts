@@ -749,7 +749,8 @@ export const KeepAlive = story({
  * since a tab that is not on top is otherwise unreachable. The button and
  * nothing else: a *Close* item would sit in a menu opened from the very header
  * the cross is already in, which is the same reason maximize and minimize are
- * buttons rather than items.
+ * buttons rather than items. *Close all* is in the menu of a strip of tabs,
+ * because no button does that.
  *
  * Closing is a *request*: the window emits `panel-close` and does nothing
  * else. Dropping the panel from `panels` is the host's — here a filter over

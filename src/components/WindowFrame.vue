@@ -1340,7 +1340,8 @@ function windowMenu(
    * It is also what leaves a pane of host content with nothing in its menu but
    * the views its panel declares — and none to open at all when it declares
    * none, which is the point: a button whose menu holds nothing but what is
-   * next to it is worse than no button.
+   * next to it is worse than no button. *Close all* is here, with the steps
+   * along the tabs, because no button does that.
    */
 
   if (tabbed && home) {
@@ -1370,6 +1371,23 @@ function tabSteps(home: WindowGroup, fallback: string): MenuItemDef[] {
   return [
     { id: 'next-tab', label: 'Next tab', action: () => selectPanel(step(1)) },
     { id: 'previous-tab', label: 'Previous tab', action: () => selectPanel(step(-1)) },
+    ...closeAllItem(home),
+  ]
+}
+
+/**
+ * *Close all*: a close request for every panel on the strip that may be closed,
+ * the same one its cross sends, so the host still decides what goes.
+ *
+ * After a rule, since it does not move along the tabs but takes them away; and
+ * not offered at all when nothing on the strip can be closed.
+ */
+function closeAllItem(home: WindowGroup): MenuItemDef[] {
+  const closing = panelIds(home).filter(canClose)
+  if (!closing.length) return []
+  return [
+    { separator: true },
+    { id: 'close-all', label: 'Close all', action: () => closing.forEach(close) },
   ]
 }
 

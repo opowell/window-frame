@@ -2235,6 +2235,27 @@ test.describe('Window — closing a panel', () => {
     await expect(menuItem(page, 'close')).toHaveCount(0)
   })
 
+  /*
+   * *Close all* is an item, since no button does it: a request per panel on
+   * the strip, the same one each tab's cross sends.
+   */
+  test('closes every tab of a strip from its menu', async ({ page }) => {
+    await gotoStory(page, CLOSABLE)
+    await openPaneMenu(page, 'sources')
+    await menuItem(page, 'close-all').click()
+    for (const id of ['sources', 'activity', 'log']) {
+      await expect(pane(page, id)).toHaveCount(0)
+    }
+    // Only the strip it was chosen from.
+    await expect(pane(page, 'items')).toHaveCount(1)
+  })
+
+  test('offers no close all where nothing can be closed', async ({ page }) => {
+    await gotoStory(page, TABS_ONLY)
+    await openPaneMenu(page, 'items')
+    await expect(menuItem(page, 'close-all')).toHaveCount(0)
+  })
+
   test('closing a tab does not also select it', async ({ page }) => {
     await gotoStory(page, CLOSABLE)
     // sources is on top; closing log's tab must leave sources on top.
