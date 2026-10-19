@@ -119,6 +119,17 @@ const props = withDefaults(
      */
     spaceNames?: boolean
     /**
+     * Whether the space at the root of the window draws a bar and a border of
+     * its own.
+     *
+     * The root is the whole window, so its bar names a thing the application
+     * around it already names — and the border around it is a second frame
+     * just inside the window's. Off, the panes sit straight in the window, and
+     * how the root is shown is the host's to offer instead: `rootMenu`, exposed,
+     * is the menu that bar would have had, for a menu bar to carry.
+     */
+    rootBar?: boolean
+    /**
      * Extends or replaces the menu a pane offers, given the items it would
      * have had: the content's own, then the window's. Return them with yours
      * appended, or something else entirely.
@@ -164,6 +175,7 @@ const props = withDefaults(
     solo: false,
     menu: true,
     spaceNames: true,
+    rootBar: true,
     theme: 'minimal',
   },
 )
@@ -1676,6 +1688,24 @@ function menuFor(id: string): MenuItemDef[] {
 }
 
 /**
+ * The menu of the space at the root of the window, for a host to put where it
+ * likes — a menu bar's, when `rootBar` is off and the root has no bar of its own
+ * to offer it from.
+ *
+ * A space at the root offers what its bar would: the four ways it can be shown.
+ * A strip at the root is a space too, its tabs being what it holds, so it offers
+ * what its tabs' heading does in a pane's menu — the same four, and the way
+ * along them.
+ */
+const rootMenu = computed<MenuItemDef[]>(() => {
+  const current = resolved.value
+  if (!current) return []
+  if (!isGroup(current)) return spaceMenu([])
+  const panel = byId.value.get(frontPanel(current))
+  return props.menu && panel ? windowMenu(current, panel).tabs : []
+})
+
+/**
  * *Pop out to new window*, for a panel the host gave an address to pop out to.
  *
  * Last of the panel's own items: it takes the panel away from everything else
@@ -1719,6 +1749,7 @@ provideWindowContext({
   resizable: computed(() => props.resizable),
   minPanelSize: computed(() => props.minPanelSize),
   spaceNames: computed(() => props.spaceNames),
+  rootBar: computed(() => props.rootBar),
   focused,
   dragging,
   dropTarget,
@@ -1829,6 +1860,11 @@ defineExpose({
    * whose space fixed its view, or took its bar away, is switched at all.
    */
   setView,
+  /**
+   * The menu of the space at the root: how the whole window is shown. For a
+   * host's menu bar, when `rootBar` takes away the bar it was on.
+   */
+  rootMenu,
   /** Brings a floating frame to the front of its stack. */
   raise,
   /** Fills the float with a window, or puts it back where it was. */

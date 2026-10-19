@@ -100,6 +100,12 @@ const menu = computed(() => win.spaceMenu(props.path))
  */
 const headless = computed(() => props.node.headless === true)
 
+/**
+ * The root of a window told to draw no bar for it: no bar, and no border
+ * either, since the window around it is the frame it would have drawn.
+ */
+const bare = computed(() => props.path.length === 0 && !win.rootBar.value)
+
 /** How this space is shown, for a test and a stylesheet to name it by. */
 const mode = computed(() => (floating.value ? 'desktop' : (split.value?.direction ?? '')))
 
@@ -334,10 +340,11 @@ function onGutterKey(event: KeyboardEvent, index: number) {
     class="dc-space"
     :data-dc-space="mode"
     :data-dc-path="path.join('/')"
+    :data-dc-bare="bare ? 'true' : undefined"
     :aria-label="title"
   >
     <header
-      v-if="!framed && !headless"
+      v-if="!framed && !headless && !bare"
       class="dc-space__head"
     >
       <span class="dc-space__title dc-truncate">{{ title }}</span>
@@ -447,6 +454,17 @@ function onGutterKey(event: KeyboardEvent, index: number) {
 .dc-float .dc-space {
   border: none;
   border-radius: 0;
+}
+
+/* The root with no bar: the window is its box, and the panes sit in it. */
+.dc-space[data-dc-bare='true'] {
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+
+.dc-space[data-dc-bare='true'] > .dc-window__split {
+  padding: 0;
 }
 
 .dc-space__head {

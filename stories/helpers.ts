@@ -732,6 +732,11 @@ export interface WorkbenchStoryArgs {
   movable?: boolean
   /** Puts a menu bar over the window, the way an application has one. */
   menuBar?: boolean
+  /**
+   * `false` draws no bar for the space at the root, and puts its menu in the
+   * menu bar's View ▸ Arrange instead.
+   */
+  rootBar?: boolean
   theme?: ShellTheme
 }
 
@@ -795,6 +800,9 @@ export function renderWorkbench(args: WorkbenchStoryArgs) {
 
       const ids = () => panels.value.map((panel) => panel.id)
 
+      /** The window, for the root's menu it exposes. */
+      const frame = ref<{ rootMenu: MenuItemDef[] } | null>(null)
+
       const menus = computed<MenuItemDef[]>(() => [
         {
           label: 'File',
@@ -856,6 +864,19 @@ export function renderWorkbench(args: WorkbenchStoryArgs) {
                 layout.value = cascade(ids().map(panelNode), { w: 380, h: 250 })
               },
             },
+            // How the root is shown, from the bar it is no longer drawn with.
+            ...(args.rootBar === false
+              ? [
+                  { separator: true },
+                  {
+                    id: 'arrange',
+                    label: 'Arrange',
+                    items: frame.value?.rootMenu.length
+                      ? frame.value.rootMenu
+                      : [{ label: 'Nothing to arrange', disabled: true }],
+                  },
+                ]
+              : []),
           ],
         },
         { label: 'Help', items: [{ label: 'Every menu here is data', disabled: true }] },
@@ -880,7 +901,9 @@ export function renderWorkbench(args: WorkbenchStoryArgs) {
           h(
             WindowFrame,
             {
+              ref: frame,
               class: 'sb-workbench__window',
+              rootBar: args.rootBar ?? true,
               panels: panels.value,
               layout: layout.value,
               'onUpdate:layout': (next: WindowNode | null) => {

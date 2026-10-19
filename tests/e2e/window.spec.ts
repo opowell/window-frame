@@ -1090,6 +1090,7 @@ const NO_PANE_MENU = 'window-panel-grid--no-pane-menu'
 const CONTENT_MENU = 'window-panel-grid--content-menu'
 const WORKBENCH = 'window-panel-grid--workbench'
 const WORKBENCH_DESKTOP = 'window-panel-grid--workbench-on-a-desktop'
+const ROOT_IN_MENU = 'window-panel-grid--workbench-root-in-menu'
 
 /*
  * The menu of a *space* rather than of a pane. A pane holding one panel holds
@@ -2262,6 +2263,42 @@ test.describe('Window — closing a panel', () => {
     await tab(page, 'log').hover()
     await closeButton(page, 'log').click()
     await expect(tab(page, 'sources')).toHaveAttribute('aria-selected', 'true')
+  })
+})
+
+/*
+ * `rootBar: false`: the root draws no bar, and its menu — the exposed
+ * `rootMenu` — is in the host's menu bar, under View ▸ Arrange.
+ */
+test.describe('Window — the root in a menu bar', () => {
+  test('the root draws no bar and no border', async ({ page }) => {
+    await gotoStory(page, ROOT_IN_MENU)
+    await expect(space(page, '')).toHaveAttribute('data-dc-bare', 'true')
+    await expect(space(page, '').locator('> .dc-space__head')).toHaveCount(0)
+    await expect(space(page, '')).toHaveCSS('border-top-width', '0px')
+  })
+
+  test('the menu bar shows the root another way', async ({ page }) => {
+    await gotoStory(page, ROOT_IN_MENU)
+    await chooseMenu(page, 'View', 'arrange')
+    await expect(menuItem(page, 'show-row')).toHaveAttribute('aria-checked', 'true')
+    await menuItem(page, 'show-column').click()
+
+    const [items, sources] = await Promise.all([boxOf(page, 'items'), boxOf(page, 'sources')])
+    expect(sources.y).toBeGreaterThan(items.y + items.height - 1)
+    await expect(space(page, '')).toHaveAttribute('data-dc-space', 'column')
+    await expect(space(page, '').locator('> .dc-space__head')).toHaveCount(0)
+  })
+
+  test('a root of tabs is arranged from the menu bar too', async ({ page }) => {
+    await gotoStory(page, ROOT_IN_MENU)
+    await chooseMenu(page, 'View', 'arrange', 'show-tabs')
+    expect(await tabOrder(page, 'items')).toEqual(['items', 'sources'])
+
+    await chooseMenu(page, 'View', 'arrange')
+    await expect(menuItem(page, 'show-tabs')).toHaveAttribute('aria-checked', 'true')
+    await menuItem(page, 'show-row').click()
+    expect(await panelOrder(page)).toEqual(['items', 'sources'])
   })
 })
 

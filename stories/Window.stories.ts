@@ -1054,6 +1054,19 @@ export const WorkbenchOnADesktop = story2({
   content: CONTENT,
 })
 
+/**
+ * **The root in the menu bar.** With `:root-bar="false"` the space at the root
+ * draws no bar and no border: the panes sit straight in the window. How the
+ * whole window is shown is then offered from View ▸ Arrange, which is the
+ * exposed `rootMenu` — the menu that bar would have had.
+ */
+export const WorkbenchRootInMenu = story2({
+  panels: [ITEMS, SOURCES],
+  layout: row([panelNode('items'), panelNode('sources')], [0.6, 0.4]),
+  content: CONTENT,
+  rootBar: false,
+})
+
 /** Every panel closed: a window with nothing in it says so rather than breaking. */
 export const WorkbenchEmpty = story2({
   panels: [],
