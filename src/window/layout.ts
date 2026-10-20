@@ -1103,8 +1103,10 @@ function normalizeGroup(node: WindowGroup): WindowNode {
     // Tabs sharing a strip with tabs are that strip's, unless the host shaped
     // that space, or it remembers a desktop of its own — in which case what it
     // said about its own bar, or the way back it holds, is why it stays a space
-    // of its own.
-    if (isGroup(next) && !hasChrome(next) && !placesOf(next)) {
+    // of its own. Nor into a strip drawn without a bar: it draws no tabs, so
+    // tabs handed to it would be on no strip at all, where the pane they were in
+    // draws its own.
+    if (isGroup(next) && !hasChrome(next) && !placesOf(next) && !node.headless) {
       panels.push(...next.panels)
       return
     }
@@ -1637,19 +1639,39 @@ function withGroup(
  * flattens: the arrangement it describes is the one already on screen.
  */
 export function spreadTabs(layout: WindowNode, id: string, direction: SplitDirection): WindowNode {
-  const next = withGroup(layout, id, (tabs) => {
-    if (tabs.panels.length < 2) return tabs
-    // A tab per pane, in the same order, so a strip that remembered a desktop
-    // hands that record on rather than spending it: the way back is the same
-    // whichever of the two tiled shapes it is being read from.
-    const places = placesOf(tabs)
-    return {
-      ...split(direction, tabs.panels.map(tabNode)),
-      ...spaceChrome(tabs),
-      ...(places ? { places } : {}),
-    }
-  })
+  const next = withGroup(layout, id, (tabs) => spreadGroup(tabs, direction))
   return next ? normalizeLayout(next) : layout
+}
+
+/**
+ * `spreadTabs`, for the strip at a path rather than the one a panel is a tab of.
+ *
+ * A strip whose tabs are all spaces — windows, say, each a pane or a grid of its
+ * own — has no panel tab to be found by: every panel on it is a tab of a pane
+ * inside it. Its place in the tree still names it.
+ */
+export function spreadTabsAt(
+  layout: WindowNode,
+  path: readonly number[],
+  direction: SplitDirection,
+): WindowNode {
+  const tabs = nodeAt(layout, path)
+  if (!tabs || !isGroup(tabs) || tabs.panels.length < 2) return layout
+  return normalizeLayout(replaceAt(layout, path, spreadGroup(tabs, direction)))
+}
+
+/** A strip's tabs as the panes of a split, in the order they were in. */
+function spreadGroup(tabs: WindowGroup, direction: SplitDirection): WindowNode {
+  if (tabs.panels.length < 2) return tabs
+  // A tab per pane, in the same order, so a strip that remembered a desktop
+  // hands that record on rather than spending it: the way back is the same
+  // whichever of the two tiled shapes it is being read from.
+  const places = placesOf(tabs)
+  return {
+    ...split(direction, tabs.panels.map(tabNode)),
+    ...spaceChrome(tabs),
+    ...(places ? { places } : {}),
+  }
 }
 
 /**
@@ -1708,11 +1730,41 @@ export function floatTabs(layout: WindowNode, id: string, rect?: Partial<FloatRe
     return next === layout ? layout : normalizeLayout(next)
   }
 
-  const next = withGroup(layout, id, (tabs) => ({
+  const next = withGroup(layout, id, (tabs) => floatGroup(tabs, rect))
+  return next ? normalizeLayout(next) : layout
+}
+
+/**
+ * `floatTabs`, for the strip at a path rather than the one a panel is a tab of —
+ * see `spreadTabsAt`. A strip that is a window's whole content becomes windows
+ * on that same desktop, as there.
+ */
+export function floatTabsAt(
+  layout: WindowNode,
+  path: readonly number[],
+  rect?: Partial<FloatRect>,
+): WindowNode {
+  const tabs = nodeAt(layout, path)
+  if (!tabs || !isGroup(tabs) || tabs.panels.length < 2) return layout
+
+  const outward = path.slice(0, -1)
+  const outer = path.length > 0 ? nodeAt(layout, outward) : null
+  const index = path[path.length - 1]
+  const held = outer && isFloat(outer) && index !== undefined ? outer.frames[index] : undefined
+  if (outer && isFloat(outer) && held && index !== undefined) {
+    const spread = cascade(tabs.panels.map(tabNode), held.rect).frames
+    const frames = [...outer.frames.slice(0, index), ...spread, ...outer.frames.slice(index + 1)]
+    return normalizeLayout(replaceAt(layout, outward, { ...outer, frames }))
+  }
+  return normalizeLayout(replaceAt(layout, path, floatGroup(tabs, rect)))
+}
+
+/** A strip's tabs as windows on a desktop in its place. */
+function floatGroup(tabs: WindowGroup, rect?: Partial<FloatRect>): WindowFloat {
+  return {
     ...float(placedFrames(tabs.panels.map(tabNode), placesOf(tabs), rect)),
     ...spaceChrome(tabs),
-  }))
-  return next ? normalizeLayout(next) : layout
+  }
 }
 
 /**

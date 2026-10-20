@@ -1067,6 +1067,20 @@ export const WorkbenchRootInMenu = story2({
   rootBar: false,
 })
 
+/**
+ * **Windows in the menu bar.** The root is a strip drawn without a bar, each of
+ * its tabs a window of its own — a pane of two tabs, and a pane of one — which
+ * the host switches between. Each window keeps its own bar, its tabs on it, and
+ * View ▸ Arrange shows the windows another way, though no panel is a tab of the
+ * strip they share.
+ */
+export const WorkbenchWindowsInMenu = story2({
+  panels: [ITEMS, SOURCES, ACTIVITY],
+  layout: headless(group([group(['items', 'sources'], 'items'), panelNode('activity')], 'items')),
+  content: CONTENT,
+  rootBar: false,
+})
+
 /** Every panel closed: a window with nothing in it says so rather than breaking. */
 export const WorkbenchEmpty = story2({
   panels: [],

@@ -39,6 +39,7 @@ import {
   floatPanel,
   floatSplit,
   floatTabs,
+  floatTabsAt,
   frameAt,
   frameOf as findFrame,
   framePathOf,
@@ -71,6 +72,7 @@ import {
   setSizesAt,
   spaceTitle,
   spreadTabs,
+  spreadTabsAt,
   swapPanels,
   tileFloat,
 } from '../window/layout'
@@ -1700,10 +1702,50 @@ function menuFor(id: string): MenuItemDef[] {
 const rootMenu = computed<MenuItemDef[]>(() => {
   const current = resolved.value
   if (!current) return []
-  if (!isGroup(current)) return spaceMenu([])
-  const panel = byId.value.get(frontPanel(current))
-  return props.menu && panel ? windowMenu(current, panel).tabs : []
+  return isGroup(current) ? stripMenu([]) : spaceMenu([])
 })
+
+/**
+ * A strip's own menu, for a strip named by where it sits: the four ways its tabs
+ * can be shown, and the way along them — what a pane's menu offers about the
+ * tabs its panel is one of.
+ *
+ * By path rather than by a panel, because a strip need not have a panel tab to
+ * be asked from: one whose tabs are all spaces — windows, each a pane of tabs
+ * or a grid of its own — has every panel on it a tab of something inside it.
+ * The strip at the root is the one a host's menu bar asks for (`rootMenu`).
+ */
+function stripMenu(path: readonly number[]): MenuItemDef[] {
+  const current = resolved.value
+  const home = current ? nodeAt(current, path) : null
+  if (!props.menu || !home || !isGroup(home) || home.panels.length < 2) return []
+
+  /** Rewrites the tree when the item is chosen, and only when that changes it. */
+  const mode = (key: string, label: string, becomes: (tree: WindowNode) => WindowNode): MenuItemDef => ({
+    id: `show-${key}`,
+    label,
+    checked: key === 'tabs',
+    action: () => {
+      const tree = resolved.value
+      if (!tree) return
+      const next = becomes(tree)
+      if (next !== tree) layout.value = next
+    },
+  })
+
+  const items: MenuItemDef[] = home.fixedView
+    ? []
+    : [
+        mode('row', 'Row', (tree) => spreadTabsAt(tree, path, 'row')),
+        mode('column', 'Column', (tree) => spreadTabsAt(tree, path, 'column')),
+        // Already true: these are tabs, and a strip collapsed is that strip.
+        mode('tabs', 'Tabs', (tree) => tree),
+        mode('desktop', 'Desktop', (tree) => floatTabsAt(tree, path)),
+      ]
+  if (items.length) items.push({ separator: true })
+  items.push(...tabSteps(home, frontPanel(home)))
+  return items
+}
 
 /**
  * *Pop out to new window*, for a panel the host gave an address to pop out to.

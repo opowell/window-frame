@@ -1091,6 +1091,7 @@ const CONTENT_MENU = 'window-panel-grid--content-menu'
 const WORKBENCH = 'window-panel-grid--workbench'
 const WORKBENCH_DESKTOP = 'window-panel-grid--workbench-on-a-desktop'
 const ROOT_IN_MENU = 'window-panel-grid--workbench-root-in-menu'
+const WINDOWS_IN_MENU = 'window-panel-grid--workbench-windows-in-menu'
 
 /*
  * The menu of a *space* rather than of a pane. A pane holding one panel holds
@@ -2299,6 +2300,33 @@ test.describe('Window — the root in a menu bar', () => {
     await expect(menuItem(page, 'show-tabs')).toHaveAttribute('aria-checked', 'true')
     await menuItem(page, 'show-row').click()
     expect(await panelOrder(page)).toEqual(['items', 'sources'])
+  })
+})
+
+/*
+ * A root strip drawn without a bar whose tabs are windows — panes of their own —
+ * rather than panels: each window draws its own bar, and the strip, which no
+ * panel is a tab of, is still arranged from the menu bar.
+ */
+test.describe('Window — windows in a menu bar', () => {
+  test('each window keeps its own bar and its tabs on it', async ({ page }) => {
+    await gotoStory(page, WINDOWS_IN_MENU)
+    expect(await tabOrder(page, 'items')).toEqual(['items', 'sources'])
+    await expect(pane(page, 'activity')).toBeHidden()
+  })
+
+  test('the menu bar steps between the windows and arranges them', async ({ page }) => {
+    await gotoStory(page, WINDOWS_IN_MENU)
+    await chooseMenu(page, 'View', 'arrange', 'next-tab')
+    await expect(pane(page, 'activity')).toBeVisible()
+    await expect(pane(page, 'activity').locator('> .dc-pane__head')).toHaveCount(1)
+
+    await chooseMenu(page, 'View', 'arrange')
+    await expect(menuItem(page, 'show-tabs')).toHaveAttribute('aria-checked', 'true')
+    await menuItem(page, 'show-row').click()
+    const [items, activity] = await Promise.all([boxOf(page, 'items'), boxOf(page, 'activity')])
+    expect(activity.x).toBeGreaterThan(items.x + items.width - 1)
+    expect(await tabOrder(page, 'items')).toEqual(['items', 'sources'])
   })
 })
 

@@ -16,6 +16,7 @@ import {
   floatPanel,
   floatSplit,
   floatTabs,
+  floatTabsAt,
   frame,
   frameAt,
   frameOf,
@@ -65,6 +66,7 @@ import {
   spaceChrome,
   spaceTitle,
   spreadTabs,
+  spreadTabsAt,
   swapPanels,
   tabPanels,
   tileFloat,
@@ -2021,5 +2023,64 @@ describe('dropIntoSpace', () => {
     expect(dropIntoSpace(tree, 'a', [4])).toBe(tree)
     expect(dropIntoSpace(tree, 'a', [0])).toBe(tree)
     expect(dropIntoSpace(tree, 'z', [1])).toBe(tree)
+  })
+})
+
+describe('a strip of windows', () => {
+  // A strip drawn without a bar, each tab a window of its own: a pane of tabs,
+  // and a pane of one. What a host makes when it keeps windows apart and
+  // switches between them itself.
+  const windows = () =>
+    headless(group([group(['browse', 'app'], 'app'), panelNode('session')], 'session'))
+
+  it('keeps each pane in it a pane, with its own tabs', () => {
+    // An ordinary strip takes a pane's tabs as its own: it draws them.
+    expect(shape(normalizeLayout(group([group(['a', 'b']), panelNode('c')])))).toBe('[a]|b|c')
+    // One without a bar draws none, so the tabs stay on the pane that does.
+    const kept = asGroup(normalizeLayout(windows()))
+    expect(shape(kept)).toBe('(browse|[app])|[(session)]')
+    expect(kept).toMatchObject({ headless: true, active: 'session' })
+    expect(normalizeLayout(windows())).toEqual(windows())
+  })
+
+  it('is spread and floated by where it sits, having no panel tab to be named by', () => {
+    // Every panel on it is a tab of a pane inside it, so the strip is not the
+    // group any of them is a tab of.
+    expect(spreadTabs(windows(), 'session', 'row')).toEqual(windows())
+    expect(floatTabs(windows(), 'session')).toEqual(windows())
+
+    const spread = asSplit(spreadTabsAt(windows(), [], 'row'))
+    expect(shape(spread)).toBe('row(browse|[app], session)')
+    expect(spread).toMatchObject({ headless: true })
+    expect(shape(spreadTabsAt(windows(), [], 'column'))).toBe('column(browse|[app], session)')
+
+    const floated = floatTabsAt(windows(), [], { x: 10, y: 20 })
+    expect(floated).toMatchObject({ kind: 'float', headless: true })
+    expect(shape(floated)).toBe(
+      `float(browse|[app]@10,20 ${DEFAULT_FRAME.w}x${DEFAULT_FRAME.h}, ` +
+        `session@${10 + CASCADE_STEP},${20 + CASCADE_STEP} ${DEFAULT_FRAME.w}x${DEFAULT_FRAME.h})`,
+    )
+  })
+
+  it('reaches a strip anywhere in the tree, and leaves what is not one alone', () => {
+    const tree = row([panelNode('log'), windows()])
+    expect(shape(spreadTabsAt(tree, [1], 'column'))).toBe('row(log, column(browse|[app], session))')
+    // Not a strip, a strip of one, a path to nothing: nothing to do.
+    expect(spreadTabsAt(tree, [0], 'row')).toBe(tree)
+    expect(spreadTabsAt(tree, [], 'row')).toBe(tree)
+    expect(spreadTabsAt(tree, [5], 'row')).toBe(tree)
+    expect(floatTabsAt(tree, [0])).toBe(tree)
+  })
+
+  it("makes a strip that is a window's whole content windows on the same desktop", () => {
+    const desk = float([
+      { node: panelNode('log'), rect: { x: 0, y: 0, w: 200, h: 120 } },
+      { node: windows(), rect: { x: 50, y: 60, w: 300, h: 200 } },
+    ])
+    const next = floatTabsAt(desk, [1])
+    expect(shape(next)).toBe(
+      'float(log@0,0 200x120, browse|[app]@50,60 300x200, ' +
+        `session@${50 + CASCADE_STEP},${60 + CASCADE_STEP} 300x200)`,
+    )
   })
 })

@@ -313,7 +313,8 @@ function onGutterKey(event: KeyboardEvent, index: number) {
     is rendered here rather than in the pane for the same reason a floating
     frame's is: this is the component that renders nodes, and the two would
     otherwise have to import each other. `framed` because the strip is that
-    space's title bar already, exactly as a floating window's bar is.
+    space's title bar already, exactly as a floating window's bar is — unless
+    the strip is drawn without one, when the space draws its own.
   -->
   <WindowPane
     v-if="pane"
@@ -324,7 +325,7 @@ function onGutterKey(event: KeyboardEvent, index: number) {
       <WindowNode
         :node="shared"
         :path="sharedPath"
-        framed
+        :framed="!pane.headless"
       />
     </template>
   </WindowPane>
