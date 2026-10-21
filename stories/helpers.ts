@@ -90,6 +90,8 @@ export interface ShellStoryArgs {
   previewsPerType?: number
   /** Restricts the offered result views. Every one of them when unset. */
   views?: ViewKind[]
+  /** Where the bar offers the list of types: only once one is chosen, or always. */
+  typeChooser?: 'scoped' | 'always'
   /**
    * Drive the real address bar instead of an in-memory route. Off by default so
    * stories stay isolated from each other; the routing stories turn it on.
@@ -148,6 +150,7 @@ export function renderShell(args: ShellStoryArgs) {
           matchWidth: args.matchWidth ?? 'grow',
           headAlign: args.headAlign ?? 'center',
           ...(args.views ? { views: args.views } : {}),
+          ...(args.typeChooser ? { typeChooser: args.typeChooser } : {}),
           ...(args.pagesNote ? { pagesNote: args.pagesNote } : {}),
           ...(args.within ? { within: args.within } : {}),
           ...(args.rowPress ? { rowPress: args.rowPress } : {}),
