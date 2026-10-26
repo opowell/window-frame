@@ -1,5 +1,5 @@
 import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue'
-import type { PropType } from 'vue'
+import type { Component, PropType } from 'vue'
 import DataShell from '../src/components/DataShell.vue'
 import FacetControl from '../src/components/FacetControl.vue'
 import ResultsArea from '../src/components/ResultsArea.vue'
@@ -35,6 +35,7 @@ import type {
   ShellWidthMatch,
   StreamingDataSource,
   ViewKind,
+  ViewsOption,
 } from '../src/types'
 import type { WindowNode, WindowPanelDef } from '../src/window/types'
 import type { MenuItemDef } from '../src/menu/types'
@@ -88,8 +89,13 @@ export interface ShellStoryArgs {
   pagesNote?: string
   /** Rows inside each type's card on the home screen. */
   previewsPerType?: number
-  /** Restricts the offered result views. Every one of them when unset. */
-  views?: ViewKind[]
+  /**
+   * Restricts the offered result views — or works them out per screen. Every
+   * one of them when unset.
+   */
+  views?: ViewsOption
+  /** A component per record the query narrows to, by type — see `recordCards`. */
+  recordCards?: Record<string, Component>
   /** Where the bar offers the list of types: only once one is chosen, or always. */
   typeChooser?: 'scoped' | 'always'
   /**
@@ -150,6 +156,7 @@ export function renderShell(args: ShellStoryArgs) {
           matchWidth: args.matchWidth ?? 'grow',
           headAlign: args.headAlign ?? 'center',
           ...(args.views ? { views: args.views } : {}),
+          ...(args.recordCards ? { recordCards: args.recordCards } : {}),
           ...(args.typeChooser ? { typeChooser: args.typeChooser } : {}),
           ...(args.pagesNote ? { pagesNote: args.pagesNote } : {}),
           ...(args.within ? { within: args.within } : {}),
