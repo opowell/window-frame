@@ -48,10 +48,10 @@ export const searchBox = (page: Page) => page.locator('.dc-header__search')
  * says the choice and opens the list, carrying the chosen key as
  * `data-dc-value`. What it offers is read through {@link pickOptions}.
  */
-export const scopeSelect = (page: Page) => page.locator('.dc-header__scope-select .dc-pick__button')
+export const scopeSelect = (page: Page) => page.locator('.dc-actions__type .dc-pick__button')
 
 /** The second: how the results are drawn. */
-export const viewSelect = (page: Page) => page.locator('.dc-header__view-select .dc-pick__button')
+export const viewSelect = (page: Page) => page.locator('.dc-actions__view .dc-pick__button')
 
 /**
  * What they are ordered by is not on the bar at all: the table's own headings
