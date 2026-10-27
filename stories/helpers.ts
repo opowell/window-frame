@@ -1,7 +1,6 @@
 import { computed, defineComponent, h, onBeforeUnmount, ref, watch } from 'vue'
 import type { Component, PropType } from 'vue'
 import DataShell from '../src/components/DataShell.vue'
-import FacetControl from '../src/components/FacetControl.vue'
 import ResultsArea from '../src/components/ResultsArea.vue'
 import StatusPill from '../src/components/StatusPill.vue'
 import WindowFrame from '../src/components/WindowFrame.vue'
@@ -24,15 +23,11 @@ import type {
   DataSource,
   DomainSchema,
   EntitySchema,
-  FacetDef,
-  FacetValue,
   RecordStatus,
   Selection,
-  ShellAlign,
   ShellQueryDefaults,
   ShellRow,
   ShellTheme,
-  ShellWidthMatch,
   StreamingDataSource,
   ViewKind,
   ViewsOption,
@@ -75,12 +70,7 @@ export interface ShellStoryArgs {
   pinnable?: boolean
   /** Offers the tick on rows even where the type names nothing to do with one. */
   selectable?: boolean
-  open?: boolean
   theme?: ShellTheme
-  /** Whether the panel grows to the bar, or the bar comes in to the panel. */
-  matchWidth?: ShellWidthMatch
-  /** Where the pair sits once `matchWidth: 'shrink'` has narrowed them. */
-  headAlign?: ShellAlign
   accent?: string
   /** Token overrides passed straight to the shell. */
   tokens?: Record<string, string>
@@ -153,8 +143,6 @@ export function renderShell(args: ShellStoryArgs) {
           pinnable: args.pinnable ?? false,
           selectable: args.selectable ?? false,
           theme: args.theme ?? 'minimal',
-          matchWidth: args.matchWidth ?? 'grow',
-          headAlign: args.headAlign ?? 'center',
           ...(args.views ? { views: args.views } : {}),
           ...(args.recordCards ? { recordCards: args.recordCards } : {}),
           ...(args.typeChooser ? { typeChooser: args.typeChooser } : {}),
@@ -164,7 +152,6 @@ export function renderShell(args: ShellStoryArgs) {
           ...(args.defaults ? { defaults: args.defaults } : {}),
           ...(args.accent ? { accent: args.accent } : {}),
           ...(args.tokens ? { tokens: args.tokens } : {}),
-          ...(args.open ? { open: true } : {}),
           ...(args.onActivate ? { onActivate: args.onActivate } : {}),
           ...(args.onCreate ? { onCreate: args.onCreate } : {}),
           ...(args.onDuplicate ? { onDuplicate: args.onDuplicate } : {}),
@@ -198,25 +185,6 @@ export function partSurface(children: unknown[], extraStyle = '') {
     { class: 'dc-shell', style: `padding:24px; min-height:100%; ${extraStyle}` },
     children as never,
   )
-}
-
-/** A facet control bound to local state, for the facet stories. */
-export function statefulFacet(facet: FacetDef, initial: FacetValue) {
-  return {
-    setup() {
-      const value = ref(initial)
-      return () =>
-        partSurface([
-          h(FacetControl, {
-            facet,
-            value: value.value,
-            onUpdate: (next: FacetValue) => {
-              value.value = next
-            },
-          }),
-        ], 'max-width:320px')
-    },
-  }
 }
 
 /** A source that answers after a delay, for exercising the pending state. */

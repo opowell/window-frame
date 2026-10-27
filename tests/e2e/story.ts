@@ -19,14 +19,8 @@ export async function gotoStory(page: Page, id: string, extraSearch = ''): Promi
 
 export const header = (page: Page) => page.locator('.dc-header')
 
-/** The bar itself, which is the surface a press anywhere on opens the panel. */
-export const headerBar = (page: Page) => page.locator('.dc-header__trigger')
-
-/**
- * What that surface does, as the button that carries it: the chevron holds
- * `aria-expanded`, names the panel it controls, and is what a keyboard reaches.
- */
-export const trigger = (page: Page) => page.locator('.dc-header__toggle')
+/** The bar's own row: the domain, and the query as it stands. */
+export const headerBar = (page: Page) => page.locator('.dc-header__main')
 /** The row of parts inside the search field, a pill per part of the query. */
 export const termBar = (page: Page) => page.locator('.dc-header__terms')
 
@@ -123,16 +117,7 @@ export async function chooseScope(page: Page, label: string): Promise<void> {
     await pickOptions(page, 'Type').filter({ hasText: label }).first().click()
     return
   }
-  // The card is content, and the open panel's scrim covers content: the panel
-  // comes down for the press and goes back up after it, so a test that was
-  // reading the panel goes on reading it.
-  const wasOpen = (await panel(page).count()) > 0
-  if (wasOpen) {
-    await page.keyboard.press('Escape')
-    await panel(page).waitFor({ state: 'hidden' })
-  }
   await typeCardHead(page, label).click()
-  if (wasOpen) await openPanel(page)
 }
 
 /** The heading of one type's card, which filters the results to that type. */
@@ -146,15 +131,7 @@ export const typeCardHead = (page: Page, label: string): Locator =>
 export async function clearScope(page: Page): Promise<void> {
   await pick(page, scopeSelect(page), 'Type', '')
 }
-export const panel = (page: Page) => page.locator('.dc-panel')
 
-/**
- * The panel's own query field: the box an expression is typed into, and the
- * parts standing in front of it — one per `field:value` term the query
- * already names, each of them a button that takes itself out.
- */
-export const expressionBox = (page: Page) => page.locator('.dc-expression')
-export const parts = (page: Page) => page.locator('.dc-part')
 export const listRows = (page: Page) => page.locator('.dc-list__row')
 
 /**
@@ -208,12 +185,6 @@ export function rowOrdinals(page: Page): Promise<string[]> {
   return listRows(page).locator('.dc-list__ordinal').allTextContents()
 }
 
-/** Opens the query panel by clicking the header, as a user would. */
-export async function openPanel(page: Page): Promise<void> {
-  await trigger(page).click()
-  await panel(page).waitFor({ state: 'visible' })
-}
-
 /**
  * Filters the results to one entity, by the name the schema gave it — the same
  * move as {@link chooseScope}, kept under the name the tests that narrow to a
@@ -221,21 +192,6 @@ export async function openPanel(page: Page): Promise<void> {
  */
 export async function pickEntity(page: Page, label: string): Promise<void> {
   await chooseScope(page, label)
-}
-
-/**
- * Clicks the scrim at a point the panel does not cover — below it if there is
- * room, otherwise in the gutter beside it.
- */
-export async function clickOutsidePanel(page: Page): Promise<void> {
-  const box = await panel(page).boundingBox()
-  if (!box) throw new Error('Query panel is not on screen')
-  const viewport = page.viewportSize()
-  if (!viewport) throw new Error('No viewport')
-
-  const below = box.y + box.height + 20
-  if (below < viewport.height - 4) await page.mouse.click(viewport.width / 2, below)
-  else await page.mouse.click(Math.max(2, box.x / 2), box.y + box.height / 2)
 }
 
 /** The shell's own query parameters, with Storybook's stripped out. */
