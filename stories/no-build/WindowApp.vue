@@ -9,7 +9,7 @@
 -->
 <script setup>
 import { ref } from 'vue'
-import { WindowFrame, column, panelNode, row } from 'header-content-layout'
+import { WindowFrame, column, panelNode, row } from 'appfr'
 import ItemsPanel from './ItemsPanel.vue'
 import SourcesPanel from './SourcesPanel.vue'
 

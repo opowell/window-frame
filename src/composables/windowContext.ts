@@ -180,7 +180,7 @@ export function useWindowContext(): WindowContext {
   const context = inject(WINDOW_CONTEXT_KEY, null)
   if (!context) {
     throw new Error(
-      '[header-content-layout] No window context found. Render this component inside <WindowFrame>.',
+      '[appfr] No window context found. Render this component inside <WindowFrame>.',
     )
   }
   return context

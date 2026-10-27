@@ -17,8 +17,8 @@ import {
   provideShellContext,
   useQueryState,
   useResults,
-} from 'header-content-layout'
-import { iRadarSchema } from 'header-content-layout/fixtures'
+} from 'appfr'
+import { iRadarSchema } from 'appfr/fixtures'
 
 const props = defineProps({
   /** The view the window's menu is on, handed down by the panel slot. */

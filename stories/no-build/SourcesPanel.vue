@@ -4,7 +4,7 @@
   style is compiled and injected here in the page along with its template.
 -->
 <script setup>
-import { StatusPill } from 'header-content-layout'
+import { StatusPill } from 'appfr'
 
 const SOURCES = [
   { name: 'Hacker News', url: 'news.ycombinator.com', status: 'ok' },
