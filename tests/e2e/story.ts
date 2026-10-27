@@ -27,16 +27,20 @@ export const headerBar = (page: Page) => page.locator('.dc-header__trigger')
  * `aria-expanded`, names the panel it controls, and is what a keyboard reaches.
  */
 export const trigger = (page: Page) => page.locator('.dc-header__toggle')
-/** The row the query sits in: its three choosers, and a pill per part of it. */
+/** The row of parts inside the search field, a pill per part of the query. */
 export const termBar = (page: Page) => page.locator('.dc-header__terms')
+
+/** The search field itself, whose edge and fill go round the parts and the box. */
+export const searchField = (page: Page) => page.locator('.dc-header__field')
 
 /** Each part, as its own button. Pressing one takes that part out of the query. */
 export const terms = (page: Page) => page.locator('.dc-term')
 
 /**
- * The box at the end of that row, where the next part is written: a draft
- * the results are read under as it is typed, that Enter ANDs on to the
- * query, and that empties as the part it made takes its place beside it.
+ * The box in that row, where the next part is written: a draft the results
+ * are read under as it is typed, that Enter ANDs on to the query, and that
+ * empties as the part it made takes its place beside it. At the end of the
+ * parts until the arrow keys step it in among them.
  */
 export const searchBox = (page: Page) => page.locator('.dc-header__search')
 
