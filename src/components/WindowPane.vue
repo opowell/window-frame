@@ -130,7 +130,7 @@ const fixed = computed(() => win.panelFor(anchor.value)?.fixed === true)
 const movable = computed(
   () =>
     !space.value &&
-    (win.canMove(activeId.value) || (floating.value && win.movable.value && !fixed.value)),
+    (win.canMove(activeId.value) || (floating.value && !fixed.value)),
 )
 
 /**

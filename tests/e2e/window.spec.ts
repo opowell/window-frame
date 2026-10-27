@@ -305,12 +305,12 @@ test.describe('Window — resizing', () => {
 })
 
 test.describe('Window — moving a panel', () => {
-  test('offers no grip, and no drag, when moving is off', async ({ page }) => {
+  test('offers a grip, and a drag, without being asked', async ({ page }) => {
     await gotoStory(page, ROW)
-    await expect(page.locator('.dc-pane__grip')).toHaveCount(0)
+    await expect(page.locator('.dc-pane__grip')).toHaveCount(3)
 
     await dragPanel(page, 'items', 'activity', 'right')
-    expect(await panelOrder(page)).toEqual(['items', 'sources', 'activity'])
+    expect(await panelOrder(page)).toEqual(['sources', 'activity', 'items'])
   })
 
   test('previews where the panel would land before it is let go', async ({ page }) => {
@@ -1086,6 +1086,7 @@ test.describe('Window — holding a panel off the grid', () => {
 
 const PANE_MENU = 'window-panel-grid--pane-menu'
 const CLOSABLE = 'window-panel-grid--closable'
+const UNCLOSABLE = 'window-panel-grid--unclosable'
 const NO_PANE_MENU = 'window-panel-grid--no-pane-menu'
 const CONTENT_MENU = 'window-panel-grid--content-menu'
 const WORKBENCH = 'window-panel-grid--workbench'
@@ -1465,7 +1466,15 @@ test.describe('Window — what a menu item is about', () => {
       await menuGroup(page, 'These tabs').evaluateAll((all) =>
         all.map((item) => item.dataset.dcItem),
       ),
-    ).toEqual(['show-row', 'show-column', 'show-tabs', 'show-desktop', 'next-tab', 'previous-tab'])
+    ).toEqual([
+      'show-row',
+      'show-column',
+      'show-tabs',
+      'show-desktop',
+      'next-tab',
+      'previous-tab',
+      'close-all',
+    ])
   })
 
   test('a heading is a name and not a choice', async ({ page }) => {
@@ -1521,7 +1530,7 @@ test.describe('Window — what a menu item is about', () => {
     ).toEqual(['show-row', 'show-column', 'show-tabs', 'show-desktop'])
     expect(
       await menuGroup(page, 'Top').evaluateAll((all) => all.map((item) => item.dataset.dcItem)),
-    ).toEqual(['next-tab', 'previous-tab'])
+    ).toEqual(['next-tab', 'previous-tab', 'close-all'])
   })
 })
 
@@ -2211,8 +2220,8 @@ test.describe('Window — closing a panel', () => {
     await expect(pane(page, 'sources')).toHaveCount(1)
   })
 
-  test('offers no close when the window is not closable', async ({ page }) => {
-    await gotoStory(page, PANE_MENU)
+  test('offers no close on a panel that says it is not closable', async ({ page }) => {
+    await gotoStory(page, UNCLOSABLE)
     await expect(page.locator('[data-dc-close]')).toHaveCount(0)
   })
 
@@ -2253,8 +2262,8 @@ test.describe('Window — closing a panel', () => {
   })
 
   test('offers no close all where nothing can be closed', async ({ page }) => {
-    await gotoStory(page, TABS_ONLY)
-    await openPaneMenu(page, 'items')
+    await gotoStory(page, UNCLOSABLE)
+    await openPaneMenu(page, 'sources')
     await expect(menuItem(page, 'close-all')).toHaveCount(0)
   })
 
@@ -2728,6 +2737,7 @@ test.describe('Window — a space whose view is fixed', () => {
     expect(await items.evaluateAll((all) => all.map((item) => item.dataset.dcItem))).toEqual([
       'next-tab',
       'previous-tab',
+      'close-all',
     ])
   })
 })

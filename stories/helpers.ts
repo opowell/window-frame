@@ -348,41 +348,6 @@ export function selectableSchema(): DomainSchema {
 }
 
 /**
- * A host that writes its counts its own way — `2.0k`, not `2,000`.
- *
- * Every population here is abbreviated, and `formatCount` says so, so the one
- * number the shell works out for itself — how many rows matched — is written
- * in the same hand as the ones beside it. Without the hook that live count
- * came out grouped and the list of types read as two lists.
- *
- * Paired with {@link abbreviatedCountsSource}, whose population is high enough
- * for the two hands to look different.
- */
-export function abbreviatedCountsSchema(): DomainSchema {
-  return {
-    ...iRadarSchema,
-    formatCount: abbreviate,
-    entities: iRadarSchema.entities.map((entity) => ({ ...entity, count: abbreviate(400) })),
-  }
-}
-
-/** `240`, `2.0k`, `1.2m` — the shape a host that abbreviates writes in. */
-function abbreviate(value: number): string {
-  if (value < 1000) return String(value)
-  if (value < 1000000) return `${(value / 1000).toFixed(1)}k`
-  return `${(value / 1000000).toFixed(1)}m`
-}
-
-/**
- * The mock source with enough rows per type that a grouped count and an
- * abbreviated one cannot be mistaken for each other: five types of four
- * hundred is `2,000` in the shell's hand and `2.0k` in the host's.
- */
-export function abbreviatedCountsSource(seed = 'iRadar'): DataSource {
-  return createMockDataSource({ seed, population: 400 })
-}
-
-/**
  * A type that has not said what its table is.
  *
  * The shell invents no columns, so this one has no table — it says so rather
@@ -595,7 +560,6 @@ export interface WindowStoryArgs {
   panels: WindowPanelDef[]
   /** Starting arrangement. Omitted lays every panel out in a row. */
   layout?: WindowNode | null
-  movable?: boolean
   resizable?: boolean
   theme?: ShellTheme
   accent?: string
@@ -605,8 +569,6 @@ export interface WindowStoryArgs {
   views?: Record<string, string>
   /** Render inside a fixed-size box rather than filling the frame. */
   inset?: boolean
-  /** Gives every panel a close button, which asks the host to drop it. */
-  closable?: boolean
   /** Whether a pane offers the menu that switches how its space is shown. */
   menu?: boolean
   /** Whether a strip that is a named space says that name beside its tabs. */
@@ -669,9 +631,7 @@ export function renderWindow(args: WindowStoryArgs) {
             'onUpdate:views': (next: Record<string, string>) => {
               views.value = next
             },
-            movable: args.movable ?? false,
             resizable: args.resizable ?? true,
-            closable: args.closable ?? false,
             onPanelClose: closePanel,
             ...(popOut
               ? {
@@ -707,7 +667,6 @@ export interface WorkbenchStoryArgs {
   layout?: WindowNode | null
   /** Content per panel id. Panels made at runtime fall back to a generic one. */
   content?: Record<string, (view: string) => unknown>
-  movable?: boolean
   /** Puts a menu bar over the window, the way an application has one. */
   menuBar?: boolean
   /**
@@ -891,8 +850,6 @@ export function renderWorkbench(args: WorkbenchStoryArgs) {
               'onUpdate:views': (next: Record<string, string>) => {
                 views.value = next
               },
-              movable: args.movable ?? true,
-              closable: true,
               theme: args.theme ?? 'minimal',
               onPanelClose: closePanel,
             },

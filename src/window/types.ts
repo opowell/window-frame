@@ -277,9 +277,9 @@ export interface WindowPanelDef {
   /** Keeps this panel where it is while every other one stays movable. */
   fixed?: boolean
   /**
-   * Whether this panel offers a close button, overriding the window's own
-   * `closable`. Closing is a request: the window emits `panel-close` and the
-   * host drops the panel from `panels`, which is what actually removes it.
+   * Whether this panel offers a close button. Every panel does unless it says
+   * `false`. Closing is a request: the window emits `panel-close` and the host
+   * drops the panel from `panels`, which is what actually removes it.
    */
   closable?: boolean
   /**

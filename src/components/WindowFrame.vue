@@ -85,19 +85,10 @@ const props = withDefaults(
   defineProps<{
     /** The panels this window can show, in the order a default layout uses. */
     panels: WindowPanelDef[]
-    /** Lets panels be dragged by their header into a new part of the grid. */
-    movable?: boolean
     /** Lets the boundary between two panels be dragged. */
     resizable?: boolean
     /** Smallest a panel may be resized to, in pixels. */
     minPanelSize?: number
-    /**
-     * Gives every panel a close button. Closing is a request, not something
-     * the window does itself: it emits `panel-close` and the host drops the
-     * panel from `panels`, which is what removes it. A panel can say otherwise
-     * with its own `closable`.
-     */
-    closable?: boolean
     /**
      * Whether a pane offers the items the *window* contributes to its menu —
      * which view it is showing, how its space is shown, the way along its
@@ -170,10 +161,8 @@ const props = withDefaults(
     theme?: ShellTheme
   }>(),
   {
-    movable: false,
     resizable: true,
     minPanelSize: 120,
-    closable: false,
     solo: false,
     menu: true,
     spaceNames: true,
@@ -352,7 +341,6 @@ const draggablePanels = computed(
 )
 
 function canMove(id: string): boolean {
-  if (!props.movable) return false
   // Somewhere to go: one movable panel among fixed ones has nowhere to land.
   if (draggablePanels.value < 1 || props.panels.length < 2) return false
   return byId.value.get(id)?.fixed !== true
@@ -811,7 +799,7 @@ function beginFrameDragAt(path: readonly number[], event: PointerEvent, grip: Fr
   // Neither has anywhere to be dragged to: one fills its float, the other is
   // docked along the bottom of it.
   if (isMaximized(held) || isMinimized(held)) return
-  if (grip === 'move' ? !props.movable : !props.resizable) return
+  if (grip !== 'move' && !props.resizable) return
 
   // The box the drag is measured against, read before anything moves: raising
   // the window is about to renumber the paths its float hands out, and the
@@ -909,7 +897,7 @@ function nudgeFrame(id: string, direction: MoveDirection, resize = false) {
   const held = current && path ? frameAt(current, path) : null
   if (!current || !path || !held) return
   if (byId.value.get(id)?.fixed === true) return
-  if (resize ? !props.resizable : !props.movable) return
+  if (resize && !props.resizable) return
   if (isMaximized(held) || isMinimized(held)) {
     announcement.value = `${titleOf(id)} is ${
       isMaximized(held) ? 'maximized' : 'minimized'
@@ -1152,12 +1140,12 @@ function selectPanel(id: string) {
 /* ------------------------------------------------------------------- menu */
 
 /*
- * Named for what it answers rather than after the prop it falls back to: a
- * `closable` here would be a second thing of that name the template can see,
- * and the one that would win.
+ * Every panel offers a close button unless it says otherwise. Closing is a
+ * request, not something the window does itself: it emits `panel-close` and
+ * the host drops the panel from `panels`, which is what removes it.
  */
 function canClose(id: string): boolean {
-  return byId.value.get(id)?.closable ?? props.closable
+  return byId.value.get(id)?.closable !== false
 }
 
 function close(id: string) {
@@ -1787,7 +1775,6 @@ provideWindowContext({
   panelFor: (id) => byId.value.get(id) ?? null,
   viewFor,
   setView,
-  movable: computed(() => props.movable),
   resizable: computed(() => props.resizable),
   minPanelSize: computed(() => props.minPanelSize),
   spaceNames: computed(() => props.spaceNames),

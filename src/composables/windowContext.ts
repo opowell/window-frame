@@ -49,7 +49,6 @@ export interface WindowContext {
   viewFor(id: string): string
   setView(id: string, view: string): void
 
-  movable: ComputedRef<boolean>
   resizable: ComputedRef<boolean>
   /** Smallest a pane may be dragged to, in pixels. */
   minPanelSize: ComputedRef<number>

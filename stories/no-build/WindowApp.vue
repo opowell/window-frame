@@ -63,8 +63,6 @@ function closePanel(id) {
     v-model:layout="layout"
     :panels="panels"
     :theme="theme"
-    movable
-    closable
     @panel-close="closePanel"
   >
     <!-- A panel's content is whatever its slot renders. This one is a

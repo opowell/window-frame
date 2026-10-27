@@ -53,7 +53,7 @@ const meta = {
           'of more than one panel is. A group of one is a plain panel and',
           'reads as one.',
           '',
-          'With `movable`, a panel can be dragged by its header onto any',
+          'A panel can be dragged by its header onto any',
           'other: the four edges split that panel and take half of it, the',
           'middle joins it as a tab, and the tab strip itself takes a drop at',
           'a position. Keyboard users get the same reach from the grip —',
@@ -202,7 +202,7 @@ export const ItemsAsCards = story({
 })
 
 /**
- * `movable`: drag a panel by its header onto another. The four edges split
+ * Drag a panel by its header onto another. The four edges split
  * that panel and take half of it; the middle joins it as a tab.
  */
 export const Movable = story({
@@ -211,7 +211,6 @@ export const Movable = story({
     [panelNode('items'), column([panelNode('sources'), panelNode('activity'), panelNode('notes')])],
     [0.6, 0.4],
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -229,7 +228,6 @@ export const Tabs = story({
     [panelNode('items'), group(['sources', 'activity', 'log'], 'activity')],
     [0.58, 0.42],
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -246,7 +244,6 @@ export const Tabs = story({
 export const TabsOnly = story({
   panels: [ITEMS, SOURCES, ACTIVITY],
   layout: group(['items', 'sources', 'activity']),
-  movable: true,
   content: CONTENT,
 })
 
@@ -259,7 +256,6 @@ export const TabsOnly = story({
 export const TabsWithActions = story({
   panels: [ITEMS, SOURCES, ACTIVITY],
   layout: group(['items', 'sources', 'activity']),
-  movable: true,
   content: CONTENT,
   actions: {
     sources: () =>
@@ -278,7 +274,6 @@ export const LayoutInUrl = story({
     [panelNode('items'), group(['sources', 'activity', 'log'], 'activity')],
     [0.58, 0.42],
   ),
-  movable: true,
   content: CONTENT,
   liveUrl: true,
 })
@@ -294,7 +289,6 @@ export const PopOut = story({
     [panelNode('items'), group(['sources', 'activity', 'log'], 'activity')],
     [0.58, 0.42],
   ),
-  movable: true,
   content: CONTENT,
   liveUrl: true,
   popOut: true,
@@ -310,7 +304,6 @@ export const TabsAndSplits = story({
     ],
     [0.68, 0.32],
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -321,7 +314,6 @@ export const TabsAndSplits = story({
  */
 export const FixedPanel = story({
   panels: [ITEMS, { ...SOURCES, fixed: true }, ACTIVITY],
-  movable: true,
   content: CONTENT,
 })
 
@@ -335,7 +327,6 @@ export const DeepNesting = story({
     ],
     [0.72, 0.28],
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -373,7 +364,6 @@ export const Light = story({
   panels: [ITEMS, SOURCES, ACTIVITY],
   layout: row([panelNode('items'), column([panelNode('sources'), panelNode('activity')])], [0.62, 0.38]),
   theme: 'light',
-  movable: true,
   content: CONTENT,
 })
 
@@ -381,7 +371,6 @@ export const Light = story({
 export const Accented = story({
   panels: [ITEMS, SOURCES, ACTIVITY],
   accent: 'oklch(0.8 0.16 340)',
-  movable: true,
   content: CONTENT,
 })
 
@@ -389,7 +378,6 @@ export const Accented = story({
 export const Embedded = story({
   panels: [ITEMS, ACTIVITY],
   inset: true,
-  movable: true,
   content: CONTENT,
 })
 
@@ -414,7 +402,6 @@ export const Floating = story({
     frame(panelNode('sources'), { x: 300, y: 150, w: 380, h: 260 }),
     frame(panelNode('activity'), { x: 150, y: 280, w: 420, h: 220 }),
   ]),
-  movable: true,
   content: CONTENT,
 })
 
@@ -434,8 +421,6 @@ export const FloatingOnMacos = story({
     frame(panelNode('activity'), { x: 150, y: 280, w: 420, h: 220 }),
   ]),
   theme: 'macos',
-  movable: true,
-  closable: true,
   content: CONTENT,
 })
 
@@ -447,8 +432,6 @@ export const FloatingOnWindows = story({
     frame(panelNode('activity'), { x: 150, y: 280, w: 420, h: 220 }),
   ]),
   theme: 'windows',
-  movable: true,
-  closable: true,
   content: CONTENT,
 })
 
@@ -463,7 +446,6 @@ export const FloatingCascade = story({
     [panelNode('items'), panelNode('sources'), panelNode('activity'), panelNode('notes')],
     { w: 420, h: 260 },
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -484,7 +466,6 @@ export const FloatingTabsAndGrids = story({
     }),
     frame(panelNode('notes'), { x: 120, y: 400, w: 320, h: 180 }),
   ]),
-  movable: true,
   content: CONTENT,
 })
 
@@ -559,7 +540,6 @@ export const FloatingBesideTiled = story({
     [0.45, 0.55],
     'Top'
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -585,7 +565,6 @@ export const FloatingMaximize = story({
     // a grid of two, since a split of one is just that one.
     frame(column([panelNode('activity'), panelNode('log')]), { x: 120, y: 340, w: 400, h: 220 }),
   ]),
-  movable: true,
   content: CONTENT,
 })
 
@@ -609,14 +588,12 @@ export const FloatingMinimize = story({
     frame(group(['sources', 'notes']), { x: 320, y: 90, w: 360, h: 240 }),
     frame(column([panelNode('activity'), panelNode('log')]), { x: 90, y: 200, w: 400, h: 220 }),
   ]),
-  movable: true,
-  closable: true,
   content: CONTENT,
 })
 
 /**
  * `resizable: false` holds every window at the size it was given while they
- * can still be moved and stacked; `movable: false` pins them entirely.
+ * can still be moved and stacked; a panel's own `fixed` pins it entirely.
  */
 export const FloatingFixedSize = story({
   panels: [ITEMS, SOURCES, ACTIVITY],
@@ -624,7 +601,6 @@ export const FloatingFixedSize = story({
     w: 400,
     h: 260,
   }),
-  movable: true,
   resizable: false,
   content: CONTENT,
 })
@@ -664,7 +640,6 @@ const story2 = (args: WorkbenchStoryArgs) => ({
 export const PaneMenu = story({
   panels: [ITEMS, SOURCES, ACTIVITY],
   layout: row([panelNode('items'), column([panelNode('sources'), panelNode('activity')])], [0.62, 0.38]),
-  movable: true,
   content: CONTENT,
 })
 
@@ -689,7 +664,6 @@ export const PaneMenu = story({
 export const ContentMenu = story({
   panels: [ITEMS_NO_VIEWS, SOURCES, ACTIVITY],
   layout: row([panelNode('items'), column([panelNode('sources'), panelNode('activity')])], [0.62, 0.38]),
-  movable: true,
   content: { ...CONTENT, items: () => h(ItemsPanel, { ownMenu: true }) },
 })
 
@@ -736,7 +710,6 @@ export const KeepAlive = story({
     ACTIVITY,
   ],
   layout: group(['notes', 'sources', 'activity'], 'notes'),
-  movable: true,
   content: {
     ...CONTENT,
     notes: () => h(KeptNotes),
@@ -745,7 +718,7 @@ export const KeepAlive = story({
 })
 
 /**
- * `closable` gives every panel a close button — one per tab in a tabbed pane,
+ * Every panel has a close button — one per tab in a tabbed pane,
  * since a tab that is not on top is otherwise unreachable. The button and
  * nothing else: a *Close* item would sit in a menu opened from the very header
  * the cross is already in, which is the same reason maximize and minimize are
@@ -762,8 +735,19 @@ export const Closable = story({
     panelNode('items'),
     group(['sources', 'activity', 'log'])
   ], [0.6, 0.4]),
-  movable: true,
-  closable: true,
+  content: CONTENT,
+})
+
+/**
+ * A panel that must stay says `closable: false`, and offers no cross — nor
+ * does a strip of such panels offer *Close all*.
+ */
+export const Unclosable = story({
+  panels: [ITEMS, SOURCES, ACTIVITY, LOG].map((panel) => ({ ...panel, closable: false })),
+  layout: row([
+    panelNode('items'),
+    group(['sources', 'activity', 'log'])
+  ], [0.6, 0.4]),
   content: CONTENT,
 })
 
@@ -774,7 +758,6 @@ export const Closable = story({
  */
 export const NoPaneMenu = story({
   panels: [ITEMS, SOURCES, ACTIVITY],
-  movable: true,
   menu: false,
   content: CONTENT,
 })
@@ -805,7 +788,6 @@ export const NamedStrip = story({
     [0.6, 0.4],
     'Top',
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -827,7 +809,6 @@ export const NamedStripPlain = story({
     'Top',
   ),
   spaceNames: false,
-  movable: true,
   content: CONTENT,
 })
 
@@ -866,7 +847,6 @@ export const SpaceInASpace = story({
     ],
     [0.6, 0.4],
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -907,7 +887,6 @@ export const EmptySpace = story({
     [0.55, 0.45],
     'Top',
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -928,7 +907,6 @@ export const FixedView = story({
     [0.62, 0.38],
   ),
   views: { items: 'cards' },
-  movable: true,
   content: CONTENT,
 })
 
@@ -947,7 +925,6 @@ export const FixedSpace = story({
   layout: fixedView(
     row([panelNode('items'), column([panelNode('sources'), panelNode('activity')])], [0.62, 0.38]),
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -963,7 +940,6 @@ export const FixedTabs = story({
     [panelNode('items'), fixedView(group(['sources', 'activity', 'log']))],
     [0.6, 0.4],
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -983,7 +959,6 @@ export const HeadlessPane = story({
     [0.62, 0.38],
   ),
   views: { items: 'cards' },
-  movable: true,
   content: CONTENT,
 })
 
@@ -998,7 +973,6 @@ export const HeadlessSpace = story({
   layout: headless(
     row([panelNode('items'), column([panelNode('sources'), panelNode('activity')])], [0.62, 0.38]),
   ),
-  movable: true,
   content: CONTENT,
 })
 
@@ -1019,7 +993,6 @@ export const HeadlessWindow = story({
     frame(panelNode('log'), { x: 452, y: 150, w: 300, h: 190 }),
   ]),
   views: { items: 'cards' },
-  movable: true,
   content: CONTENT,
 })
 

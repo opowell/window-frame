@@ -67,7 +67,7 @@ const maximized = computed(() => isMaximized(props.frame))
 const minimized = computed(() => isMinimized(props.frame))
 const settled = computed(() => maximized.value || minimized.value)
 const resizable = computed(() => win.resizable.value && !fixed.value && !settled.value)
-const movable = computed(() => win.movable.value && !fixed.value && !settled.value)
+const movable = computed(() => !fixed.value && !settled.value)
 
 /** The panel a rolled-up window's close button would close, if there is one. */
 const only = computed(() => {
