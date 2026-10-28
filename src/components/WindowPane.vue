@@ -28,7 +28,7 @@ import {
 import type { MoveDirection } from '../composables/windowContext'
 import { useWindowContext } from '../composables/windowContext'
 import { providePaneContext } from '../composables/paneMenu'
-import MenuButton from './MenuButton.vue'
+import { MenuButton } from 'menu-bar'
 import WindowGlyph from './WindowGlyph.vue'
 import WindowPaneBody from './WindowPaneBody.vue'
 

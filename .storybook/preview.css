@@ -1,0 +1,184 @@
+/*
+ * Canvas-only setup. The shell fills whatever box it is given, so the story
+ * frame has to be a full-height box — this is the host's job in a real app too.
+ */
+
+html,
+body,
+#storybook-root {
+  height: 100%;
+  margin: 0;
+}
+
+#storybook-root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The default theme is paper; match it so the frame behind never flashes. */
+body {
+  background: #fff;
+}
+
+.sb-frame {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The story frame is the host: it is what gives the shell its height. */
+.sb-frame > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Used by the "embedded" story to prove the shell works at less than full page. */
+.sb-inset {
+  display: flex;
+  flex-direction: column;
+  height: 460px;
+  margin: 24px;
+  border: 1px solid oklch(0.82 0.004 240);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/*
+ * Hosts for the `inherit` theme stories. Each brings its own background, text
+ * colour and typeface; a shell dropped inside should take them on rather than
+ * painting over them.
+ */
+.sb-host {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 20px;
+  font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+}
+
+.sb-host > * {
+  flex: 1;
+  min-height: 0;
+}
+
+.sb-host--paper {
+  background: #f7f3ea;
+  color: #2c2a25;
+  color-scheme: light;
+}
+
+.sb-host--slate {
+  background: #101a2b;
+  color: #d9e2f0;
+  /* What a dark host owes the components inside it: system colours, native
+     controls and scrollbars all key off this. */
+  color-scheme: dark;
+}
+
+/*
+ * Panel content for the window stories. The window renders whatever a slot
+ * gives it, so this is the host's styling, not the library's — it only
+ * borrows the shell's tokens.
+ */
+
+.sb-pane-list {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+
+.sb-pane-list__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--dc-radius-sm);
+}
+
+.sb-pane-list__row:hover {
+  background: var(--dc-bg-2);
+}
+
+.sb-pane-list__primary {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dc-fg-0);
+}
+
+.sb-pane-list__secondary {
+  flex: 1;
+  font-size: 11px;
+  color: var(--dc-fg-3);
+}
+
+.sb-pane-log {
+  margin: 0;
+  padding: 12px;
+  font-size: 11px;
+  color: var(--dc-fg-2);
+}
+
+.sb-pane-log__line {
+  padding: 2px 0;
+  white-space: pre-wrap;
+}
+
+/*
+ * The workbench stories are a menu bar over a window. Only the window takes
+ * the height — `.sb-frame > *` would otherwise stretch the bar as well.
+ */
+.sb-workbench > .dc-menubar {
+  flex: 0 0 auto;
+}
+
+/*
+ * The cards a story puts through `cards-before` and `cards-after`. The card
+ * frame is the shell's — `<ShellCard>` — and what goes inside it is the
+ * host's, which for a record's own card is a name, the reference under it and
+ * whatever it holds.
+ */
+.sb-record__name {
+  margin: 0;
+  font-size: var(--dc-text-heading, 18px);
+  font-weight: var(--dc-weight-semibold);
+  color: var(--dc-fg-0);
+}
+
+.sb-record__ref {
+  font-size: var(--dc-text-meta);
+  color: var(--dc-fg-3);
+}
+
+.sb-record__note {
+  margin: 0;
+  color: var(--dc-fg-2);
+}
+
+.sb-record__source {
+  margin: 0;
+  padding: 14px 16px;
+  font-family: var(--dc-mono);
+  font-size: var(--dc-text-code);
+  color: var(--dc-fg-2);
+}
+
+/* The KeepAlive story's note pad. */
+.sb-kept {
+  padding: 12px 14px;
+}
+
+.sb-kept__mounts,
+.sb-kept__line {
+  margin: 0 0 6px;
+  color: var(--dc-fg-2);
+}
+
+.sb-kept__text {
+  display: block;
+  width: 100%;
+  min-height: 80px;
+  margin: 0 0 10px;
+  font: inherit;
+}

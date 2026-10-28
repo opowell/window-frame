@@ -26,7 +26,7 @@ import {
   spaceTitle,
 } from '../window/layout'
 import { useWindowContext } from '../composables/windowContext'
-import MenuButton from './MenuButton.vue'
+import { MenuButton } from 'menu-bar'
 import WindowFloat from './WindowFloat.vue'
 import WindowPane from './WindowPane.vue'
 

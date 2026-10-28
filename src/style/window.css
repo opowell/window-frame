@@ -1,0 +1,112 @@
+/* -------------------------------------------------------- window controls */
+
+/*
+ * Minimize, maximize and close, wherever a window puts them: the pane header
+ * that is a floating window's title bar, and the bar a grouped window draws
+ * itself. Both mark the group `.dc-controls` and each button `.dc-control`,
+ * and both leave them in the same order in the markup — minimize, maximize,
+ * close — so that the only thing which varies is what a theme says here.
+ *
+ * The shell's own themes say nothing: the buttons are the small square ones
+ * each component already draws, at the right hand end where the markup put
+ * them. It is the two operating system themes that have an opinion.
+ */
+
+/*
+ * A Mac's are traffic lights, at the left of the bar and led by close: lit
+ * whether or not the pointer is near them, and empty until it is.
+ */
+
+.dc-shell[data-dc-theme='macos'] .dc-controls {
+  order: -1;
+  gap: 8px;
+}
+
+.dc-shell[data-dc-theme='macos'] .dc-controls .dc-control {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border-radius: 50%;
+  /* The rim a Mac draws around each light, which keeps the yellow one off a
+     light title bar. */
+  box-shadow: inset 0 0 0 0.5px oklch(0 0 0 / 0.12);
+}
+
+/*
+ * The marks arrive with the pointer and leave with it, which is the part of a
+ * Mac's lights people know without being able to say: at rest the bar carries
+ * three colours, not three symbols.
+ *
+ * Hung off the group rather than the button, because hovering any one light
+ * shows all three — and off `:focus-within` as well, since a keyboard arriving
+ * at a control is asking the same question the pointer is.
+ *
+ * The colour is set here rather than on the button so that it is the mark's
+ * own: a hover rule meant for a square grey button has no business repainting
+ * the inside of a red circle.
+ */
+
+.dc-shell[data-dc-theme='macos'] .dc-controls .dc-glyph {
+  /* Not white, and not the ink: at 12px across a solid colour, a dark tint of
+     what is under it is the only mark that reads without shouting. */
+  color: oklch(0 0 0 / 0.62);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.dc-shell[data-dc-theme='macos'] .dc-controls:hover .dc-glyph,
+.dc-shell[data-dc-theme='macos'] .dc-controls:focus-within .dc-glyph {
+  opacity: 1;
+}
+
+/*
+ * Close, minimize, zoom — the order a Mac has had since the first one, and the
+ * reverse of the order every other system uses. The markup is not rewritten
+ * for it; the buttons are reordered where they are drawn.
+ */
+
+.dc-shell[data-dc-theme='macos'] .dc-controls .dc-control[data-dc-close] {
+  order: -3;
+  background: var(--dc-control-close);
+}
+
+.dc-shell[data-dc-theme='macos'] .dc-controls .dc-control[data-dc-minimize] {
+  order: -2;
+  background: var(--dc-control-minimize);
+}
+
+.dc-shell[data-dc-theme='macos'] .dc-controls .dc-control[data-dc-maximize] {
+  order: -1;
+  background: var(--dc-control-zoom);
+}
+
+/*
+ * Fluent's are wide, flat and flush into the corner: full bar height, square,
+ * no gap between them, and no colour until the pointer arrives — at which
+ * point close, and only close, turns red.
+ */
+
+.dc-shell[data-dc-theme='windows'] .dc-controls {
+  align-self: stretch;
+  gap: 0;
+}
+
+.dc-shell[data-dc-theme='windows'] .dc-controls .dc-control {
+  align-self: stretch;
+  width: 38px;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  color: var(--dc-fg-1);
+}
+
+.dc-shell[data-dc-theme='windows'] .dc-controls .dc-control:hover {
+  background: var(--dc-bg-3);
+  color: var(--dc-fg-0);
+}
+
+.dc-shell[data-dc-theme='windows'] .dc-controls .dc-control[data-dc-close]:hover {
+  background: var(--dc-control-close);
+  /* White on that red in both schemes: the red is the same red in both. */
+  color: #fff;
+}

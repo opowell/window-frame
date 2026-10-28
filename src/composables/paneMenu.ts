@@ -14,7 +14,7 @@
  */
 import { getCurrentScope, inject, onScopeDispose, provide, toValue } from 'vue'
 import type { ComputedRef, InjectionKey, MaybeRefOrGetter } from 'vue'
-import type { MenuItemDef } from '../menu/types'
+import type { MenuItemDef } from 'menu-bar'
 import { WINDOW_CONTEXT_KEY } from './windowContext'
 
 /** What the content of a pane is told about the pane it is rendered in. */

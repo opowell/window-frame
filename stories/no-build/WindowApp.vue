@@ -1,7 +1,6 @@
 <!--
-  The second host this page can mount: the panel grid rather than the shell.
-  `?app=window` picks it, and the loader compiles this file and the two panel
-  components it imports the same way it compiles `App.vue`.
+  The host this page mounts: a panel grid. The loader compiles this file and
+  the two panel components it imports in the page, from source.
 
   Everything the layout is made of — `row`, `column`, `panelNode` — comes out
   of `dist/index.js` as plain functions, so the arrangement is data the host
@@ -9,7 +8,7 @@
 -->
 <script setup>
 import { ref } from 'vue'
-import { WindowFrame, column, panelNode, row } from 'appfr'
+import { WindowFrame, column, panelNode, row } from 'window-frame'
 import ItemsPanel from './ItemsPanel.vue'
 import SourcesPanel from './SourcesPanel.vue'
 

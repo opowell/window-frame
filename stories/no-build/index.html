@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>window-frame, with no build step</title>
+
+    <!--
+      There is no bundler, no transform and no install step behind this page.
+      Every file it needs is fetched over HTTP as it sits on disk: an import
+      map names the built artifacts, `<script type="module">` loads them, and
+      vue3-sfc-loader compiles the host's own `.vue` files here in the tab.
+      The host is a panel grid with two panels of its own written as
+      components, one of them running a real query through `appfr`.
+
+      The vendored paths are what npm already put in `node_modules`, served
+      verbatim by Storybook's `staticDirs`. Public CDNs are drop-in
+      replacements, and the page is otherwise unchanged:
+
+        vue       https://unpkg.com/vue@3/dist/vue.runtime.esm-browser.prod.js
+        loader    https://unpkg.com/vue3-sfc-loader@0.9/dist/vue3-sfc-loader.esm.js
+        window    https://unpkg.com/window-frame/dist/index.js
+        menus     https://unpkg.com/menu-bar/dist/index.js
+        shell     https://unpkg.com/appfr/dist/index.js
+
+      It needs a server — ES modules and `fetch` do not work from `file:`.
+      Any static one will do: `npx serve`, `python3 -m http.server`, nginx.
+    -->
+
+    <!-- The shipped stylesheets, linked like any others: the tokens every
+         `.dc-shell` resolves against, the menus the panes open, the shell the
+         items panel holds, and the window's own. -->
+    <link
+      class="dc-style"
+      rel="stylesheet"
+      href="/vendor/themes/tokens.css"
+    />
+    <link
+      class="dc-style"
+      rel="stylesheet"
+      href="/vendor/menu-bar/style.css"
+    />
+    <link
+      class="dc-style"
+      rel="stylesheet"
+      href="/vendor/appfr/style.css"
+    />
+    <link
+      class="dc-style"
+      rel="stylesheet"
+      href="/dist/style.css"
+    />
+    <script>
+      /* Negative control: `?no-css` drops the stylesheets before they can
+         apply, so the checklist below has something real to fail on. A
+         checklist that cannot fail is decoration. */
+      if (new URLSearchParams(location.search).has('no-css'))
+        for (const link of document.querySelectorAll('.dc-style')) link.remove()
+    </script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "vue": "/vendor/vue/vue.runtime.esm-browser.prod.js",
+          "window-frame": "/dist/index.js",
+          "menu-bar": "/vendor/menu-bar/index.js",
+          "appfr": "/vendor/appfr/index.js",
+          "appfr/fixtures": "/vendor/appfr/fixtures.js"
+        }
+      }
+    </script>
+
+    <!-- The page's own chrome. Deliberately independent of the library's
+         stylesheet, so it still reads when that one is missing. -->
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        color: #101010;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      #report {
+        flex: 0 0 auto;
+        padding: 10px 14px;
+        border-bottom: 1px solid #e3e3e3;
+        background: #fafafa;
+      }
+
+      #verdict {
+        margin: 0 0 6px;
+        font-weight: 600;
+      }
+
+      #verdict[data-ok='true'] {
+        color: #14663a;
+      }
+
+      #verdict[data-ok='false'] {
+        color: #9a1c1c;
+      }
+
+      #verdict[data-done='false']::after {
+        content: ' …';
+      }
+
+      #checks {
+        display: grid;
+        grid-template-columns: auto auto 1fr;
+        gap: 1px 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .nb-check {
+        display: contents;
+      }
+
+      .nb-mark {
+        text-align: center;
+      }
+
+      .nb-check[data-ok='true'] .nb-mark {
+        color: #14663a;
+      }
+
+      .nb-check[data-ok='false'] .nb-mark,
+      .nb-check[data-ok='false'] .nb-note {
+        color: #9a1c1c;
+      }
+
+      .nb-note {
+        color: #6a6a6a;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      #stage {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+
+      #app {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+      }
+
+      #sources {
+        flex: 0 0 58ch;
+        overflow: auto;
+        border-right: 1px solid #e3e3e3;
+        background: #fafafa;
+      }
+
+      #sources:empty {
+        display: none;
+      }
+
+      .nb-source__name {
+        position: sticky;
+        top: 0;
+        padding: 6px 12px;
+        border-bottom: 1px solid #e3e3e3;
+        background: #f0f0f0;
+        font-weight: 600;
+      }
+
+      .nb-source__text {
+        margin: 0;
+        padding: 10px 12px 16px;
+        font: inherit;
+        white-space: pre-wrap;
+        tab-size: 2;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header id="report">
+      <p
+        id="verdict"
+        data-done="false"
+        data-ok="false"
+      >
+        Checking the built artifacts
+      </p>
+      <ol id="checks"></ol>
+    </header>
+
+    <div id="stage">
+      <aside id="sources"></aside>
+      <main id="app"></main>
+    </div>
+
+    <script type="module">
+      /*
+       * The whole of the build-free wiring. Read top to bottom: it loads the
+       * artifacts, compiles the host's SFCs, mounts, and states what happened.
+       */
+
+      const params = new URLSearchParams(location.search)
+      const checks = []
+      /** Every `.vue` file the loader asked for, and the text it got back. */
+      const sources = new Map()
+
+      /* The host the page mounts, and how to tell that it arrived. */
+      const entry = {
+        file: './WindowApp.vue',
+        mounted() {
+          const panes = document.querySelectorAll('.dc-pane').length
+          if (!panes) throw new Error('the window rendered no panes')
+          // Whichever view that panel is on — the window's menu and the URL
+          // can both put it on another one.
+          const rows = document.querySelectorAll(
+            '.dc-results :is(.dc-table__row, .dc-list__row, .dc-card, .dc-tile, .dc-link)',
+          ).length
+          if (!rows) throw new Error('the items panel rendered nothing')
+          const names = [...document.querySelectorAll('.dc-tab__name')]
+            .map((element) => element.textContent.trim())
+            .join(', ')
+          return `${panes} panes — ${names} — with ${rows} rows in the first`
+        },
+      }
+
+      const list = document.getElementById('checks')
+      const verdict = document.getElementById('verdict')
+
+      function paint() {
+        list.replaceChildren(
+          ...checks.map((record) => {
+            const item = document.createElement('li')
+            item.className = 'nb-check'
+            item.dataset.check = record.id
+            item.dataset.ok = String(record.ok)
+
+            const mark = document.createElement('span')
+            mark.className = 'nb-mark'
+            mark.textContent = record.ok ? '✓' : '✗'
+
+            const label = document.createElement('span')
+            label.className = 'nb-label'
+            label.textContent = record.label
+
+            const note = document.createElement('span')
+            note.className = 'nb-note'
+            note.textContent = record.note
+
+            item.append(mark, label, note)
+            return item
+          }),
+        )
+
+        const failed = checks.filter((record) => !record.ok).length
+        verdict.dataset.ok = String(failed === 0)
+        verdict.textContent = failed
+          ? `${failed} of ${checks.length} checks failed`
+          : `${checks.length} checks passed — the built artifacts run with no build step`
+      }
+
+      /** Runs one check, records what it said, and keeps going either way. */
+      async function check(id, label, run) {
+        const record = { id, label, ok: false, note: '' }
+        checks.push(record)
+        try {
+          record.note = (await run()) ?? ''
+          record.ok = true
+        } catch (error) {
+          record.note = error instanceof Error ? error.message : String(error)
+        }
+        paint()
+        return record.ok
+      }
+
+      let Vue
+      let frame
+      let shell
+      let fixtures
+      let loader
+      let host
+
+      await check('vue', 'Vue 3 resolves through the import map', async () => {
+        Vue = await import('vue')
+        return `Vue ${Vue.version} — the runtime build; the SFC compiler comes with the loader`
+      })
+
+      await check('window', 'dist/index.js imports as an ES module', async () => {
+        frame = await import('window-frame')
+        if (!frame.WindowFrame || typeof frame.panelNode !== 'function')
+          throw new Error('the bundle loaded but does not export the window')
+        return `${Object.keys(frame).length} named exports, reached by bare specifier`
+      })
+
+      await check('shell', 'so does the shell one panel holds', async () => {
+        shell = await import('appfr')
+        if (!shell.ResultsArea || typeof shell.useQueryState !== 'function')
+          throw new Error('appfr loaded but does not export the shell')
+        return `appfr, and menu-bar under it, through the same import map`
+      })
+
+      await check('fixtures', 'and the shell’s fixtures subpath', async () => {
+        fixtures = await import('appfr/fixtures')
+        return `schemas: ${Object.keys(fixtures.schemas).join(', ')}`
+      })
+
+      await check('loader', 'vue3-sfc-loader is here to do the compiling', async () => {
+        loader = await import('/vendor/vue3-sfc-loader/vue3-sfc-loader.esm.js')
+        return `vue3-sfc-loader ${loader.version}, carrying the compiler for Vue ${loader.vueVersion}`
+      })
+
+      /*
+       * What the loader is given: the modules it must not fetch (they are
+       * already here, and the shell has to be the same instance of Vue), a way
+       * to read a file, and somewhere to put an SFC's `<style>`.
+       */
+      const options = {
+        moduleCache: {
+          vue: Vue,
+          'window-frame': frame,
+          appfr: shell,
+          'appfr/fixtures': fixtures,
+        },
+        /*
+         * How one file's import names another. Bare specifiers are module
+         * names, so they go straight to `moduleCache` above; the rest resolve
+         * as URLs, the way the browser would resolve them — the loader's own
+         * default joins them as strings and folds `http://` down to `http:/`.
+         */
+        pathResolve({ refPath, relPath }) {
+          if (relPath === '.') return refPath
+          if (!relPath.startsWith('.') && !relPath.startsWith('/')) return relPath
+          return new URL(relPath, refPath ?? document.baseURI).href
+        },
+        async getFile(url) {
+          const response = await fetch(url)
+          if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${url}`)
+          const text = await response.text()
+          sources.set(url, text)
+          return { getContentData: () => text }
+        },
+        addStyle(css) {
+          const style = document.createElement('style')
+          style.textContent = css
+          document.head.append(style)
+        },
+      }
+
+      await check('compile', 'the host’s .vue files are compiled in the page', async () => {
+        if (!loader) throw new Error('no loader to compile with')
+        host = await loader.loadModule(new URL(entry.file, document.baseURI).href, options)
+
+        const text = sources.values().next().value ?? ''
+        if (!text.includes('<template>'))
+          throw new Error('the server sent something other than SFC source')
+        if (typeof host.render !== 'function')
+          throw new Error('the loader returned a module with no render function')
+
+        const names = [...sources.keys()].map((url) => url.split('/').pop())
+        return `${names.join(' + ')} fetched as text, compiled after load`
+      })
+
+      await check('mount', 'the host mounts and shows its content', async () => {
+        if (!host) throw new Error('nothing to mount')
+        Vue.createApp(host).mount('#app')
+        await Vue.nextTick()
+
+        // The window is a `.dc-shell` surface, which is where it gets its
+        // tokens from.
+        if (!document.querySelector('.dc-shell')) throw new Error('no shell in the DOM')
+        return `${entry.mounted()}, under ${location.search || 'the default query'}`
+      })
+
+      await check('style', 'the stylesheets are doing the layout', async () => {
+        const element = document.querySelector('.dc-shell')
+        if (!element) throw new Error('no shell to measure')
+
+        const style = getComputedStyle(element)
+        const surface = style.getPropertyValue('--dc-surface').trim()
+        if (!surface) throw new Error('the shell has no --dc-surface: tokens.css never applied')
+        if (style.containerType !== 'inline-size')
+          throw new Error(`the shell is not a query container (container-type: ${style.containerType})`)
+
+        return `--dc-surface: ${surface}, container-type: ${style.containerType}`
+      })
+
+      /* `?source` shows the text the browser was handed, beside what it became. */
+      if (params.has('source')) {
+        document.getElementById('sources').replaceChildren(
+          ...[...sources].flatMap(([url, text]) => {
+            const name = document.createElement('p')
+            name.className = 'nb-source__name'
+            name.textContent = url.split('/').pop()
+
+            const body = document.createElement('pre')
+            body.className = 'nb-source__text'
+            body.textContent = text
+
+            return [name, body]
+          }),
+        )
+      }
+
+      verdict.dataset.done = 'true'
+      paint()
+    </script>
+  </body>
+</html>

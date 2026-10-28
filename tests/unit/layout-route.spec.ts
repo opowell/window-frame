@@ -16,7 +16,7 @@ import {
   column,
 } from '../../src/window/layout'
 import { useLayoutRoute } from '../../src/composables/useLayoutRoute'
-import { createMemoryAdapter } from '../../src/routing/memory'
+import { createMemoryAdapter } from 'appfr'
 
 const roundTrip = (node: WindowNode) => decodeLayout(encodeLayout(node))
 

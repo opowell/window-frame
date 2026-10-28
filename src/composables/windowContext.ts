@@ -1,6 +1,6 @@
 import { inject, provide } from 'vue'
 import type { ComputedRef, InjectionKey, Ref, VNode } from 'vue'
-import type { MenuItemDef } from '../menu/types'
+import type { MenuItemDef } from 'menu-bar'
 import type {
   DropEdge,
   FloatFrame,

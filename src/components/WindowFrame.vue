@@ -7,16 +7,16 @@
  * the in-flight drag. What a panel *contains* is never its business: the
  * matching slot renders it.
  *
- * The tokens stylesheet is imported here for the same reason `DataShell` does
- * it: a CSS import from the type-bearing entry point ends up in the emitted
+ * The window controls' stylesheet is imported here rather than from the entry
+ * point: a CSS import from the type-bearing entry point ends up in the emitted
  * `.d.ts` as a module consumers cannot resolve.
  */
-import '../style/tokens.css'
+import '../style/window.css'
 
 import { computed, h, nextTick, onBeforeUnmount, ref, useSlots } from 'vue'
 import type { VNode } from 'vue'
-import type { ShellTheme } from '../types'
-import type { MenuItemDef } from '../menu/types'
+import type { ShellTheme } from 'themes'
+import type { MenuItemDef } from 'menu-bar'
 import type {
   DropEdge,
   FloatRect,

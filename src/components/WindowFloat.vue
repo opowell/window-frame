@@ -23,7 +23,7 @@ import {
   spaceTitle,
 } from '../window/layout'
 import { useWindowContext } from '../composables/windowContext'
-import MenuButton from './MenuButton.vue'
+import { MenuButton } from 'menu-bar'
 import WindowGlyph from './WindowGlyph.vue'
 
 const props = defineProps<{

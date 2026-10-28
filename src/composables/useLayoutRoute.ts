@@ -1,9 +1,24 @@
 import { computed, getCurrentScope, onScopeDispose, toValue, watch } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter, Ref } from 'vue'
-import type { RouteAdapter } from '../routing/adapter'
 import type { WindowNode } from '../window/types'
 import { decodeLayout, encodeLayout } from '../window/codec'
 import { headless, panelNode } from '../window/layout'
+
+/**
+ * What the layout needs of a route: the search it reads and rewrites, the path
+ * a pop-out's link is built on, and the router's own `href` for one where it
+ * has it. Any route adapter with these members can be passed as it is.
+ */
+export interface LayoutRouteAdapter {
+  /** Current search string including the leading `?`, or `''` when empty. */
+  readonly search: Ref<string>
+  /** Current path, which a pop-out's link keeps. */
+  readonly path: Ref<string>
+  /** Navigate, replacing the current history entry. */
+  replace(search: string): void
+  /** The `href` the browser would load for a search, where the router knows better than the path. */
+  href?(search: string): string
+}
 
 export interface UseLayoutRouteOptions {
   /**
@@ -13,7 +28,7 @@ export interface UseLayoutRouteOptions {
    * adapters over one address bar each write from a search the other has
    * since changed.
    */
-  adapter: RouteAdapter
+  adapter: LayoutRouteAdapter
   /** The query parameter the layout is held in. `w` by default. */
   param?: string
   /**
