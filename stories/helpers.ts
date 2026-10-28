@@ -67,6 +67,8 @@ export interface ShellStoryArgs {
   within?: string
   /** What pressing a row means: narrow to the record, or report it. */
   rowPress?: 'open' | 'narrow'
+  /** Every table row a link all the way across, rather than its name alone. */
+  rowLinks?: boolean
   pinnable?: boolean
   /** Offers the tick on rows even where the type names nothing to do with one. */
   selectable?: boolean
@@ -88,6 +90,8 @@ export interface ShellStoryArgs {
   recordCards?: Record<string, Component>
   /** Where the bar offers the list of types: only once one is chosen, or always. */
   typeChooser?: 'scoped' | 'always'
+  /** Which end of the strip the count of ticks and its Clear sit at. */
+  selectionPlacement?: 'start' | 'end'
   /**
    * Drive the real address bar instead of an in-memory route. Off by default so
    * stories stay isolated from each other; the routing stories turn it on.
@@ -146,9 +150,11 @@ export function renderShell(args: ShellStoryArgs) {
           ...(args.views ? { views: args.views } : {}),
           ...(args.recordCards ? { recordCards: args.recordCards } : {}),
           ...(args.typeChooser ? { typeChooser: args.typeChooser } : {}),
+          ...(args.selectionPlacement ? { selectionPlacement: args.selectionPlacement } : {}),
           ...(args.pagesNote ? { pagesNote: args.pagesNote } : {}),
           ...(args.within ? { within: args.within } : {}),
           ...(args.rowPress ? { rowPress: args.rowPress } : {}),
+          ...(args.rowLinks ? { rowLinks: args.rowLinks } : {}),
           ...(args.defaults ? { defaults: args.defaults } : {}),
           ...(args.accent ? { accent: args.accent } : {}),
           ...(args.tokens ? { tokens: args.tokens } : {}),
