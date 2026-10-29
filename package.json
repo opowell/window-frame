@@ -1,6 +1,6 @@
 {
   "name": "window-frame",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Panels in a recursively split grid for Vue 3 — tabbed, floating and draggable where you want them, with the whole layout held as data.",
   "license": "MIT",
   "type": "module",
